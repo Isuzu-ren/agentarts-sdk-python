@@ -76,7 +76,16 @@ class V11Signer:
         return url_path
 
     def _canonical_query_string(self, query_params: dict | None) -> str:
-        """Build canonical query string."""
+        """Build canonical query string.
+
+        .. warning::
+
+            The data-plane gateway does **not** include the query string in
+            the V11 canonical request (it may inject/rewrite query params en
+            route).  ``sign()`` therefore signs an *empty* canonical query
+            line; this method is kept only as the standard-V11 reference
+            implementation and is **not** used to build the signature.
+        """
         if not query_params:
             return ""
 
@@ -88,13 +97,9 @@ class V11Signer:
             if isinstance(value, list):
                 sorted_values = sorted(str(v) for v in value)
                 for v in sorted_values:
-                    # Values keep '/' unencoded: the data-plane gateway decodes
-                    # the wire query and treats '/' as safe when re-canonicalising,
-                    # so the signature must match that form (e.g. upload's `path`
-                    # value like /home/user/test.txt). Keys never contain '/'.
-                    arr.append(f"{ke}={quote(str(v), safe='~/')}")
+                    arr.append(f"{ke}={self._urlencode(v)}")
             else:
-                arr.append(f"{ke}={quote(str(value), safe='~/')}")
+                arr.append(f"{ke}={self._urlencode(str(value))}")
         return "&".join(arr)
 
     def _canonical_headers(self, headers: dict[str, str], signed_headers: list[str]) -> str:
@@ -168,10 +173,20 @@ class V11Signer:
 
         signed_headers = self._signed_headers(headers)
 
+        # The data-plane gateway does NOT include the query string in the V11
+        # canonical request (it may inject/rewrite query params en route, the
+        # same way it can rewrite Content-Type/Content-Length). Signing the
+        # query therefore makes the gateway's recomputation diverge and fails
+        # verification (HTTP 401) for *any* request carrying query params —
+        # e.g. upload's `path=/home/user/...` — while query-less requests
+        # (e.g. invoke) succeed.  Verified against the real data-plane gateway:
+        # query signed -> 401; empty canonical query -> 200/4xx (auth passes).
+        # The query is still sent on the wire (by the HTTP client); only its
+        # participation in the signature is dropped.
         canonical_request = (
             f"{method.upper()}\n"
             f"{self._canonical_uri(path)}\n"
-            f"{self._canonical_query_string(query_params)}\n"
+            f"\n"
             f"{self._canonical_headers(headers, signed_headers)}\n"
             f"{';'.join(signed_headers)}\n"
             f"UNSIGNED-PAYLOAD"
