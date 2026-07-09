@@ -27,7 +27,7 @@ def download_files_cmd(
     output: Annotated[str | None, typer.Option("--output", "-o", help="Local output path")] = None,
     recursive: Annotated[bool, typer.Option("--recursive", help="Download directory as tar archive")] = False,
     bearer_token: Annotated[str | None, typer.Option("--bearer-token", "-bt", help="Bearer token for authentication")] = None,
-    region: Annotated[str | None, typer.Option("--region", help="Region name")] = None,
+    region: Annotated[str | None, typer.Option("--region", "-r", help="Region name")] = None,
     endpoint: Annotated[str | None, typer.Option("--endpoint", "-e", help="Endpoint name")] = None,
     skip_ssl_verification: Annotated[bool, typer.Option("--skip-ssl-verification", "-k", help="Skip SSL certificate verification")] = False,
     user_id: Annotated[str | None, typer.Option("--user-id", "-u", help="User ID for OAuth2 outbound credentials")] = None,
