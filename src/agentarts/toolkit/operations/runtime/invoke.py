@@ -86,7 +86,10 @@ def _resolve_agent_info(
         region: Region (may be None)
 
     Returns:
-        Tuple of (agent_name, region, agent_id, auth_type) with resolved values
+        Tuple of (agent_name, region, agent_id, auth_type) with resolved values.
+        auth_type defaults to "IAM" when it cannot be resolved from the config
+        (no config file, or the agent has no identity_configuration), so the
+        data-plane commands sign with V11-HMAC-SHA256.
     """
     agent_id = None
     auth_type = None
@@ -123,7 +126,13 @@ def _resolve_agent_info(
         else:
             logger.info("Agent '%s' not found in config, using default IAM authentication", agent_name)
             auth_type = "IAM"
-    return agent_name, region, agent_id, auth_type
+    # Data-plane commands (start/stop session, invoke, exec-command, upload/download
+    # files) sign exclusively with V11-HMAC-SHA256; the SDK-HMAC-SHA256 branch is
+    # never used for signing. When auth_type can't be resolved from the config
+    # (no .agentarts_config.yaml, or the agent has no identity_configuration),
+    # default to "IAM" so these commands still sign with V11 instead of silently
+    # sending an unsigned request that the IAM data-plane gateway rejects (401).
+    return agent_name, region, agent_id, auth_type or "IAM"
 
 
 def _check_file_transfer_enabled(

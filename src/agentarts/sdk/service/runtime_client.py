@@ -1064,6 +1064,12 @@ class RuntimeClient:
         """
         full_url = self._data_client._config.base_url + url
 
+        # Apply AK/SK signing (V11-HMAC-SHA256 for IAM agents) — same as
+        # BaseHTTPClient._request. Without this, download_files sent an
+        # unsigned request and the data-plane gateway rejected it (401).
+        if self._data_client._open_ak_sk:
+            kwargs = self._data_client._sign_request(method, full_url, **kwargs)
+
         timeout = kwargs.pop("timeout", self._data_client._config.timeout)
 
         try:
