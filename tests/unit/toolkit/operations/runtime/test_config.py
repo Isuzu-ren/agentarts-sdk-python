@@ -40,6 +40,13 @@ class TestDetectPlatform:
         result = detect_platform()
         assert result in ("linux/amd64", "linux/arm64")
 
+    @patch("platform.machine", return_value="riscv64")
+    @patch("platform.system", return_value="Linux")
+    def test_unknown_defaults_to_linux_arm64(self, mock_system, mock_machine):
+        """An unrecognised architecture defaults to linux/arm64 (the backend
+        is predominantly arm)."""
+        assert detect_platform() == "linux/arm64"
+
 
 class TestDetectArch:
     """Tests for detect_arch() function."""
@@ -72,6 +79,13 @@ class TestDetectArch:
         """Returns X86_64 for non-arm machine strings (case-insensitive)."""
         result = detect_arch()
         assert result == ArchType.X86_64
+
+    @patch("platform.machine", return_value="riscv64")
+    def test_unknown_arch_defaults_to_arm64(self, mock_machine):
+        """An unrecognised architecture defaults to arm64 (the AgentArts
+        backend is predominantly arm)."""
+        result = detect_arch()
+        assert result == ArchType.ARM64
 
 
 class TestDetectDependencyFile:
@@ -286,6 +300,24 @@ class TestAddAgent:
         config = load_config()
         agent = config.get_agent("test-agent")
         assert agent.base.arch == ArchType.X86_64
+
+    def test_arch_and_platform_default_to_arm_when_omitted(self, tmp_path, monkeypatch):
+        """A config that omits arch/platform defaults to arm64 / linux/arm64 —
+        the AgentArts backend is predominantly arm, so the field defaults (not
+        the machine detection) prefer arm over x86."""
+        (tmp_path / ".agentarts_config.yaml").write_text(
+            "default_agent: test-agent\n"
+            "agents:\n"
+            "  test-agent:\n"
+            "    base:\n"
+            "      name: test-agent\n"
+            "      region: cn-southwest-2\n"
+        )
+        monkeypatch.chdir(tmp_path)
+
+        agent = load_config().get_agent("test-agent")
+        assert agent.runtime.arch == ArchType.ARM64
+        assert agent.base.platform == "linux/arm64"
 
 
 class TestRemoveAgent:
