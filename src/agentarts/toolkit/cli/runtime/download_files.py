@@ -50,13 +50,13 @@ def download_files_cmd(
 
     Examples:
         # Download single file
-        agentarts runtime download-files --agent myagent --session <session-id> --path /home/user/data.txt
+        agentarts runtime download-files --agent myagent --session <session-id> --path /tmp/data.txt
 
         # Download with custom output path
-        agentarts runtime download-files -a myagent -s <session-id> -p /home/user/data.txt -o ./local_data.txt
+        agentarts runtime download-files -a myagent -s <session-id> -p /tmp/data.txt -o ./local_data.txt
 
         # Download directory as tar
-        agentarts runtime download-files -a myagent -s <session-id> -p /home/user/project --recursive
+        agentarts runtime download-files -a myagent -s <session-id> -p /tmp/project --recursive
 
         # Use bearer token
         agentarts runtime download-files -a myagent -s <session-id> -p /data/file.txt -bt <token>

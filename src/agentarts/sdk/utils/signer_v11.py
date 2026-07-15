@@ -178,7 +178,7 @@ class V11Signer:
         # same way it can rewrite Content-Type/Content-Length). Signing the
         # query therefore makes the gateway's recomputation diverge and fails
         # verification (HTTP 401) for *any* request carrying query params —
-        # e.g. upload's `path=/home/user/...` — while query-less requests
+        # e.g. upload's `path=/tmp/...` — while query-less requests
         # (e.g. invoke) succeed.  Verified against the real data-plane gateway:
         # query signed -> 401; empty canonical query -> 200/4xx (auth passes).
         # The query is still sent on the wire (by the HTTP client); only its

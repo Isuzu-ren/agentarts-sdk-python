@@ -190,7 +190,7 @@ class TestRuntimeClientUploadFiles:
                     {"local_file": tmp1_path},
                     {"local_file": tmp2_path},
                 ],
-                path="/home/user/",
+                path="/tmp/",
             )
 
             assert result["files"] == 2
@@ -198,7 +198,7 @@ class TestRuntimeClientUploadFiles:
             call_kwargs = mock_data.call_args.kwargs
             assert "files" in call_kwargs
             params = call_kwargs.get("params", {})
-            assert params.get("path") == "/home/user/"
+            assert params.get("path") == "/tmp/"
         finally:
             Path(tmp1_path).unlink()
             Path(tmp2_path).unlink()

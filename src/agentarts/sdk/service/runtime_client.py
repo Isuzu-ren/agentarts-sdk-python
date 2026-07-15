@@ -818,7 +818,7 @@ class RuntimeClient:
         agent_name: str,
         session_id: str,
         files: list[dict[str, Any]],
-        path: str = "/home/user/",
+        path: str = "/tmp/",
         file_user_id: int | None = None,
         file_group_id: int | None = None,
         file_mode: str | None = None,
@@ -840,7 +840,8 @@ class RuntimeClient:
             files: List of file specs, each with "local_file" (local file path).
             path: Remote directory path (must end with '/'). For single file upload,
                   this is the full remote file path. For multiple files, this is the
-                  remote directory where files will be uploaded.
+                  remote directory where files will be uploaded. Defaults to '/tmp/'
+                  (writable in most container images, unlike /home/user).
             file_user_id: File owner user ID (None for backend default).
             file_group_id: File owner group ID (None for backend default).
             file_mode: File permissions mode in octal (None for backend default).
