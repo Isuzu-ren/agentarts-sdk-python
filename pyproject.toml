@@ -356,6 +356,14 @@ ignore = [
     "F841",
 ]
 
+[tool.ruff.lint.isort]
+# Tell ruff's isort (I) that `agentarts` is first-party so imports are split
+# into stdlib / third-party / first-party sections. Without this, ruff treats
+# `agentarts.*` as third-party and silently passes mis-sorted imports where a
+# third-party import (e.g. huaweicloudsdkagentidentity) lands after first-party
+# ones — which CI (ruff auto-detecting first-party) flags but local runs miss.
+known-first-party = ["agentarts"]
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ARG", "S101", "F841", "PLR2004", "RUF059"]
 "__init__.py" = ["F401"]
