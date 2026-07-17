@@ -273,7 +273,7 @@ agentarts runtime exec-command "pip install pandas" -a my-agent -s session-xxx -
 #### 示例 4: 使用 Bearer Token
 
 ```bash
-agentarts runtime exec-command "cat /home/user/data.txt" -a my-agent -s session-xxx -bt your-token
+agentarts runtime exec-command "cat /tmp/data.txt" -a my-agent -s session-xxx -bt your-token
 ```
 
 ---
@@ -291,7 +291,7 @@ agentarts runtime exec-command "cat /home/user/data.txt" -a my-agent -s session-
 | `--agent` | `-a` | Agent 名称（必填） | 无 |
 | `--session` | `-s` | 会话 ID（必填） | 无 |
 | `--files` | `-f` | 本地文件路径（可多次指定，必填） | 无 |
-| `--path` | `-p` | 远程目录路径，必须以 `/` 结尾（如 `/home/user/`） | `/home/user/` |
+| `--path` | `-p` | 远程目录路径，必须以 `/` 结尾（如 `/tmp/`）。默认 `/tmp/`，因为 `/tmp` 在多数镜像中可写，而 `/home/user` 在很多镜像中无写入权限 | `/tmp/` |
 | `--file-user-id` | 无 | 文件所有者用户 ID | `1000` |
 | `--file-group-id` | 无 | 文件所有者组 ID | `1000` |
 | `--file-mode` | `-m` | 文件权限（八进制格式） | `0644` |
@@ -306,7 +306,7 @@ agentarts runtime exec-command "cat /home/user/data.txt" -a my-agent -s session-
 
 #### 默认目录上传
 
-文件上传到默认目录 `/home/user/`：
+文件上传到默认目录 `/tmp/`（`/tmp` 在多数镜像中可写；若镜像中 `/home/user` 无写入权限，请用 `--path` 指定可写目录）：
 
 ```bash
 agentarts runtime upload-files -a my-agent -s session-xxx -f local_file.txt
@@ -429,25 +429,25 @@ runtime:
 #### 示例 1: 下载单个文件
 
 ```bash
-agentarts runtime download-files --agent my-agent --session session-xxx --path /home/user/data.txt
+agentarts runtime download-files --agent my-agent --session session-xxx --path /tmp/data.txt
 ```
 
 #### 示例 2: 指定输出路径
 
 ```bash
-agentarts runtime download-files -a my-agent -s session-xxx -p /home/user/data.txt -o ./local_data.txt
+agentarts runtime download-files -a my-agent -s session-xxx -p /tmp/data.txt -o ./local_data.txt
 ```
 
 #### 示例 3: 下载目录
 
 ```bash
-agentarts runtime download-files -a my-agent -s session-xxx -p /home/user/project --recursive
+agentarts runtime download-files -a my-agent -s session-xxx -p /tmp/project --recursive
 ```
 
 #### 示例 4: 使用 Bearer Token
 
 ```bash
-agentarts runtime download-files -a my-agent -s session-xxx -p /home/user/data.txt -bt your-token
+agentarts runtime download-files -a my-agent -s session-xxx -p /tmp/data.txt -bt your-token
 ```
 
 ---
@@ -473,7 +473,7 @@ agentarts runtime upload-files -a my-agent -s session-xxx -f data.txt
 agentarts runtime exec-command "pip install pandas" -a my-agent -s session-xxx
 
 # 下载文件
-agentarts runtime download-files -a my-agent -s session-xxx -p /home/user/result.txt
+agentarts runtime download-files -a my-agent -s session-xxx -p /tmp/result.txt
 ```
 
 3. **停止会话**

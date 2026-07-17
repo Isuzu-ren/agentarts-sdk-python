@@ -46,7 +46,9 @@ def detect_platform() -> str:
         if machine in ("arm64", "aarch64"):
             return "linux/arm64"
 
-    return "linux/amd64"
+    # Unknown architecture: default to linux/arm64 (the backend is
+    # predominantly arm).
+    return "linux/arm64"
 
 
 def init_project(

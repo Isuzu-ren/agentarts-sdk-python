@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "agentarts-sdk"
-version = "0.1.3dev2026070701"
+version = "0.1.4"
 description = "Huawei Cloud AgentArts SDK - Build, deploy and manage AI agents with cloud capabilities"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -247,6 +247,8 @@ precision = 2
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# Notebooks are exploratory examples; don't lint their import ordering.
+extend-exclude = ["*.ipynb", "*.ipynb_checkpoints"]
 
 [tool.ruff.lint]
 select = [

@@ -36,7 +36,7 @@ def upload_files_cmd(
         list[str] | None,
         typer.Option("--files", "-f", help="Local file path to upload. Can be specified multiple times for multiple files [required]"),
     ] = None,
-    path: Annotated[str, typer.Option("--path", "-p", help="Remote directory path to upload files to. Must end with '/' (e.g., /home/user/). Default: /home/user/")] = "/home/user/",
+    path: Annotated[str, typer.Option("--path", "-p", help="Remote directory path to upload files to. Must end with '/' (e.g., /tmp/). Default: /tmp/ — /tmp is writable in most container images, unlike /home/user which many images restrict.")] = "/tmp/",
     file_user_id: Annotated[int | None, typer.Option("--file-user-id", help="File owner user ID (default: 1000)")] = None,
     file_group_id: Annotated[int | None, typer.Option("--file-group-id", help="File owner group ID (default: 1000)")] = None,
     file_mode: Annotated[str | None, typer.Option("--file-mode", "-m", help="File permissions in octal (default: 0644)")] = None,
@@ -62,7 +62,7 @@ def upload_files_cmd(
               enabled: true
 
     Examples:
-        # Single file (uploaded to default /home/user/)
+        # Single file (uploaded to default /tmp/)
         agentarts runtime upload-files --agent myagent --session <session-id> -f file1.txt
 
         # Multiple files (use -f multiple times)

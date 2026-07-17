@@ -58,13 +58,45 @@ class TestResolveAgentInfo:
     """Tests for _resolve_agent_info() function."""
 
     def test_returns_none_when_no_config(self, tmp_path, monkeypatch):
-        """Returns None values when no config exists."""
+        """With no config, name/region are None but auth_type defaults to IAM
+        so data-plane commands still sign with V11 (not an unsigned request)."""
         monkeypatch.chdir(tmp_path)
 
-        name, region, _agent_id, _auth_type = _resolve_agent_info(None, None)
+        name, region, _agent_id, auth_type = _resolve_agent_info(None, None)
 
         assert name is None
         assert region is None
+        assert auth_type == "IAM"
+
+    def test_defaults_to_iam_when_agent_has_no_identity_config(self, tmp_path, monkeypatch):
+        """An agent in config but without identity_configuration defaults to
+        IAM (V11 signing) rather than None (which would send an unsigned
+        request that the data-plane gateway rejects with 401)."""
+        config_content = """
+default_agent: test-agent
+agents:
+  test-agent:
+    base:
+      name: test-agent
+      region: cn-north-4
+    runtime:
+      agent_id: agent-123
+"""
+        (tmp_path / ".agentarts_config.yaml").write_text(config_content)
+        monkeypatch.chdir(tmp_path)
+
+        _name, _region, _agent_id, auth_type = _resolve_agent_info(None, None)
+
+        assert auth_type == "IAM"
+
+    def test_defaults_to_iam_when_agent_passed_but_not_in_config(self, tmp_path, monkeypatch):
+        """A passed agent not listed in the config defaults to IAM."""
+        monkeypatch.chdir(tmp_path)
+
+        _name, _region, _agent_id, auth_type = _resolve_agent_info("some-agent", None)
+
+        assert auth_type == "IAM"
+
 
     def test_resolves_from_config(self, tmp_path, monkeypatch):
         """Resolves agent info from config file."""

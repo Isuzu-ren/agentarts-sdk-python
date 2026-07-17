@@ -109,7 +109,7 @@ agents:
                         )
 
                         call_args = mock_instance.upload_files.call_args
-                        assert call_args.kwargs["path"] == "/home/user/"
+                        assert call_args.kwargs["path"] == "/tmp/"
         finally:
             Path(tmp_path_file).unlink()
 
@@ -146,7 +146,7 @@ agents:
                                 {"local_file": tmp1_path},
                                 {"local_file": tmp2_path},
                             ],
-                            path="/home/user/",
+                            path="/tmp/",
                             session_id="session-123",
                         )
 
@@ -154,7 +154,7 @@ agents:
                         call_args = mock_instance.upload_files.call_args
                         files_arg = call_args.kwargs["files"]
                         assert len(files_arg) == 2
-                        assert call_args.kwargs["path"] == "/home/user/"
+                        assert call_args.kwargs["path"] == "/tmp/"
         finally:
             Path(tmp1_path).unlink()
             Path(tmp2_path).unlink()

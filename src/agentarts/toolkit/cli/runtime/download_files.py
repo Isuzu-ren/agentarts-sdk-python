@@ -27,7 +27,7 @@ def download_files_cmd(
     output: Annotated[str | None, typer.Option("--output", "-o", help="Local output path")] = None,
     recursive: Annotated[bool, typer.Option("--recursive", help="Download directory as tar archive")] = False,
     bearer_token: Annotated[str | None, typer.Option("--bearer-token", "-bt", help="Bearer token for authentication")] = None,
-    region: Annotated[str | None, typer.Option("--region", help="Region name")] = None,
+    region: Annotated[str | None, typer.Option("--region", "-r", help="Region name")] = None,
     endpoint: Annotated[str | None, typer.Option("--endpoint", "-e", help="Endpoint name")] = None,
     skip_ssl_verification: Annotated[bool, typer.Option("--skip-ssl-verification", "-k", help="Skip SSL certificate verification")] = False,
     user_id: Annotated[str | None, typer.Option("--user-id", "-u", help="User ID for OAuth2 outbound credentials")] = None,
@@ -50,13 +50,13 @@ def download_files_cmd(
 
     Examples:
         # Download single file
-        agentarts runtime download-files --agent myagent --session <session-id> --path /home/user/data.txt
+        agentarts runtime download-files --agent myagent --session <session-id> --path /tmp/data.txt
 
         # Download with custom output path
-        agentarts runtime download-files -a myagent -s <session-id> -p /home/user/data.txt -o ./local_data.txt
+        agentarts runtime download-files -a myagent -s <session-id> -p /tmp/data.txt -o ./local_data.txt
 
         # Download directory as tar
-        agentarts runtime download-files -a myagent -s <session-id> -p /home/user/project --recursive
+        agentarts runtime download-files -a myagent -s <session-id> -p /tmp/project --recursive
 
         # Use bearer token
         agentarts runtime download-files -a myagent -s <session-id> -p /data/file.txt -bt <token>

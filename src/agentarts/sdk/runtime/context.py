@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
-from _contextvars import ContextVar
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field

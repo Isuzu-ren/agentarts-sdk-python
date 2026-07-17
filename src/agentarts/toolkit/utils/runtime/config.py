@@ -44,7 +44,12 @@ def detect_arch() -> ArchType:
     machine = platform_module.machine().lower()
     if machine in ("aarch64", "arm64"):
         return ArchType.ARM64
-    return ArchType.X86_64
+    if machine in ("x86_64", "amd64"):
+        return ArchType.X86_64
+    # Unknown architecture: default to arm64 — the AgentArts backend is
+    # predominantly arm, so an unrecognised machine is more likely to target
+    # arm than x86.
+    return ArchType.ARM64
 
 
 class AuthType(str, Enum):
@@ -75,7 +80,7 @@ class BaseConfig(BaseModel):
         description="Huawei Cloud region",
     )
     platform: str = Field(
-        default="linux/amd64",
+        default="linux/arm64",
         description="Platform of the AgentArts runtime",
     )
     language: str = Field(
@@ -527,8 +532,9 @@ class AgentArtsRuntimeConfig(BaseModel):
         description="Agent gateway ID",
     )
     arch: ArchType = Field(
-        default=ArchType.X86_64,
-        description="Architecture type: arm64 or x86_64",
+        default=ArchType.ARM64,
+        description="Architecture type: arm64 or x86_64. Defaults to arm64 "
+        "(the AgentArts backend is predominantly arm).",
     )
     execution_agency_name: str | None = Field(
         default=None,

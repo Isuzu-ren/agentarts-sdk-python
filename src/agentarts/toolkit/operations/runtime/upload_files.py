@@ -20,7 +20,7 @@ def upload_runtime_files(
     agent_name: str | None = None,
     session_id: str | None = None,
     files: list[dict[str, str]] | None = None,
-    path: str = "/home/user/",
+    path: str = "/tmp/",
     file_user_id: int | None = None,
     file_group_id: int | None = None,
     file_mode: str | None = None,
@@ -37,7 +37,9 @@ def upload_runtime_files(
         agent_name: Agent name
         session_id: Session ID
         files: List of file specs with local_file
-        path: Remote directory path (must end with '/')
+        path: Remote directory path (must end with '/'). Defaults to '/tmp/'
+            since /tmp is writable in most container images, unlike /home/user
+            which many images restrict.
         file_user_id: File owner user ID (None for backend default)
         file_group_id: File owner group ID (None for backend default)
         file_mode: File permissions in octal (None for backend default)

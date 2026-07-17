@@ -43,6 +43,13 @@ class TestDetectPlatform:
         result = detect_platform()
         assert result == "linux/amd64"
 
+    @patch("platform.machine", return_value="riscv64")
+    @patch("platform.system", return_value="Linux")
+    def test_unknown_defaults_to_linux_arm64(self, mock_system, mock_machine):
+        """An unrecognised architecture defaults to linux/arm64 (the backend
+        is predominantly arm)."""
+        assert detect_platform() == "linux/arm64"
+
 
 class TestGetTemplateEnvVars:
     """Tests for get_template_env_vars() function."""

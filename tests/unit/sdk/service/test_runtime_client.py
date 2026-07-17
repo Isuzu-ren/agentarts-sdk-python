@@ -190,7 +190,7 @@ class TestRuntimeClientUploadFiles:
                     {"local_file": tmp1_path},
                     {"local_file": tmp2_path},
                 ],
-                path="/home/user/",
+                path="/tmp/",
             )
 
             assert result["files"] == 2
@@ -198,7 +198,7 @@ class TestRuntimeClientUploadFiles:
             call_kwargs = mock_data.call_args.kwargs
             assert "files" in call_kwargs
             params = call_kwargs.get("params", {})
-            assert params.get("path") == "/home/user/"
+            assert params.get("path") == "/tmp/"
         finally:
             Path(tmp1_path).unlink()
             Path(tmp2_path).unlink()
@@ -346,6 +346,42 @@ class TestRuntimeClientDownloadFiles:
         assert result.success is True
         assert result.status_code == 200
         assert "octet-stream" in result.content_type
+
+    def test_download_files_signs_when_ak_sk_enabled(self):
+        """Regression: _request_stream must sign (V11) when the data client has
+        open_ak_sk set. Previously download_files called session.request
+        directly, bypassing signing -> unsigned request -> HTTP 401 on IAM
+        agents (while upload_files, which goes through _request, signed fine)."""
+        from types import SimpleNamespace
+
+        from agentarts.sdk.service.http_client import SignMode
+
+        client = RuntimeClient(
+            data_endpoint="https://test.example.com",
+            sign_mode=SignMode.V11_HMAC_SHA256,
+            region_id="cn-southwest-2",
+        )
+        client._data_client._credentials = SimpleNamespace(
+            ak="ak", sk="sk", security_token=None
+        )
+        assert client._data_client._open_ak_sk is True
+
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.ok = True
+        mock_response.headers = {"Content-Type": "application/octet-stream"}
+        mock_response.iter_content.return_value = iter([b"test content"])
+
+        with patch.object(
+            client._data_client, "_sign_request", return_value={"headers": {}}
+        ) as mock_sign, patch.object(
+            client._data_client._session, "request", return_value=mock_response
+        ):
+            client.download_files(
+                agent_name="test-agent", session_id="session-123", path="/x"
+            )
+
+        mock_sign.assert_called_once()
 
     def test_download_files_recursive_tar(self):
         client = RuntimeClient(data_endpoint="https://test.example.com")
