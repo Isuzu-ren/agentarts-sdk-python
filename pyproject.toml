@@ -80,14 +80,17 @@ web = [
     "fastapi>=0.104.0",
 ]
 langchain = [
-    "langchain>=0.1.0",
-    "langchain-core>=0.1.0",
-    "langchain-community>=0.0.10",
+    # Pin to the 1.x line: loose lower bounds (>=0.1.0) let pip consider
+    # ancient langchain 0.1 (needs langchain-core 0.1) alongside langgraph 1.x
+    # (needs langchain-core 1.x), causing unresolvable backtracking / conflicts.
+    "langchain>=1.0.0",
+    "langchain-core>=1.0.0",
+    "langchain-community>=0.4.0",
 ]
 langgraph = [
     "langgraph>=1.0.0",
-    "langchain>=0.1.0",
-    "langchain-core>=0.1.0",
+    "langchain>=1.0.0",
+    "langchain-core>=1.0.0",
 ]
 autogen = [
     "pyautogen>=0.2.0",
