@@ -5,7 +5,75 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentarts.toolkit.operations.runtime.exec_command import exec_runtime_command
+from agentarts.toolkit.operations.runtime.exec_command import (
+    _needs_shell,
+    build_command_array,
+    exec_runtime_command,
+)
+
+
+class TestNeedsShell:
+    """Quote-aware detection of shell-only constructs."""
+
+    @pytest.mark.parametrize("cmd", [
+        "echo '1214' > test1.txt",   # redirection outside quotes
+        "cat f | grep x",            # pipe
+        "cd /tmp && pwd",           # &&
+        "cd /tmp || pwd",           # ||
+        "echo a;b",                 # ;
+        "sleep 1 &",                # background &
+        "echo hi $(date)",          # command substitution
+        "echo hi `date`",           # backtick
+        "echo a>>f",                # >> redirection
+    ])
+    def test_shell_constructs_detected(self, cmd):
+        assert _needs_shell(cmd) is True
+
+    @pytest.mark.parametrize("cmd", [
+        "ls -la",
+        "echo 1214",
+        'echo "a > b"',             # > inside double quotes -> literal
+        "echo 'a;b'",               # ; inside single quotes -> literal
+        "find . -name '*.py'",      # glob not in operator set; * quoted anyway
+        'grep ">" f',               # > quoted -> literal
+        "curl 'http://x?a=1&b=2'",  # & inside quotes -> literal
+    ])
+    def test_no_shell_construct(self, cmd):
+        assert _needs_shell(cmd) is False
+
+
+class TestBuildCommandArray:
+    """Docker exec-form vs auto sh -c wrapping."""
+
+    def test_plain_command_exec_form(self):
+        assert build_command_array("ls -la /home") == ["ls", "-la", "/home"]
+
+    def test_shell_construct_wraps_with_sh_c(self):
+        cmd = "echo 1214 > test1.txt"
+        assert build_command_array(cmd) == ["sh", "-c", cmd]
+
+    def test_wrap_uses_original_string_not_shlex_joined(self):
+        # sh -c only uses its first arg as the script; the array must be exactly
+        # ["sh","-c",<original>] so sh re-parses quotes/operators consistently.
+        cmd = "echo '1214' > test1.txt"
+        arr = build_command_array(cmd)
+        assert arr[0] == "sh"
+        assert arr[1] == "-c"
+        assert arr[2] is cmd  # original string, not shlex-joined
+
+    def test_quoted_metacharacter_stays_exec_form(self):
+        arr = build_command_array('echo "a > b"')
+        assert arr == ["echo", "a > b"]
+
+    def test_explicit_sh_c_wrapper_is_passed_through(self):
+        # No shell operators outside quotes -> stays exec-form as-is, which
+        # already runs sh -c on the backend. Users can force a shell this way.
+        cmd = 'sh -c "echo 1214 > f.txt"'
+        assert build_command_array(cmd) == ["sh", "-c", "echo 1214 > f.txt"]
+
+    def test_empty_after_split_raises(self):
+        with pytest.raises(ValueError, match="empty"):
+            build_command_array("   ")
 
 
 class TestExecRuntimeCommand:
