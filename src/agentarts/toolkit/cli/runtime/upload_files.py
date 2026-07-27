@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeRemainingColumn
 
+from agentarts.sdk.service.runtime_client import upload_content_type
 from agentarts.toolkit.operations.runtime.upload_files import upload_runtime_files
 from agentarts.toolkit.utils.common import echo_error, echo_info, echo_success
 
@@ -114,7 +115,14 @@ def upload_files_cmd(
             total_size += file_size
             file_list.append({"local_file": local_path})
 
-        upload_mode = "streaming (octet-stream)" if len(file_list) == 1 else "multipart"
+        if len(file_list) == 1:
+            # Mirror the actual Content-Type the data plane will send: tar goes
+            # on the application/x-tar channel, everything else on octet-stream.
+            only_file = file_list[0]["local_file"]
+            ct = upload_content_type(only_file)
+            upload_mode = f"streaming ({ct})"
+        else:
+            upload_mode = "multipart"
         console.print(f"[dim]Upload mode: {upload_mode}[/dim]")
 
         if total_size >= 1024 * 1024:
