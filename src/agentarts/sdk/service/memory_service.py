@@ -332,7 +332,7 @@ class MemoryHttpService:
                 data=text_data,
                 headers=final_headers,
                 verify=self.verify_ssl,
-                timeout=60
+                timeout=self.timeout
             )
 
             if response.status_code in {200, 201}:

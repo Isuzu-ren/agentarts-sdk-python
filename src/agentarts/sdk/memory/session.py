@@ -419,3 +419,23 @@ class MemorySession:
         """
         logger.info(f"Deleting memory record: {memory_id}")
         self._data_plane.delete_memory(self.space_id, memory_id)
+
+    def close(self) -> None:
+        """
+        Close the session and release resources.
+        """
+        if hasattr(self, "_data_plane") and self._data_plane is not None:
+            self._data_plane.close()
+            logger.info("MemorySession closed")
+
+    def __enter__(self) -> "MemorySession":
+        """
+        Enter the runtime context of the session.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """
+        Exit the runtime context of the session.
+        """
+        self.close()
