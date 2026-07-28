@@ -43,7 +43,7 @@ class _Recorded:
 class _Handler(BaseHTTPRequestHandler):
     recorded: _Recorded
 
-    def log_message(self, *args, **kwargs):  # noqa: ARG002
+    def log_message(self, *args, **kwargs):
         return
 
     def _read_body(self) -> bytes:
@@ -52,7 +52,7 @@ class _Handler(BaseHTTPRequestHandler):
             return self.rfile.read(length)
         return b""
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         self.recorded.method = self.command
         self.recorded.path = self.path
         self.recorded.headers = {k.lower(): v for k, v in self.headers.items()}
@@ -93,6 +93,14 @@ def _make_tar(path: Path, fmt: int = tarfile.USTAR_FORMAT) -> None:
         t.addfile(info, io.BytesIO(data))
 
 
+def _path_query(rec) -> str:
+    """Extract the `path` query param the client sent to the upload endpoint."""
+    from urllib.parse import parse_qs, urlsplit
+
+    qs = parse_qs(urlsplit(rec.path).query)
+    return (qs.get("path") or [""])[0]
+
+
 def test_single_tar_suffix_routes_to_x_tar(local_server, tmp_path):
     base, client, rec = local_server
     tar_path = tmp_path / "payload.tar"
@@ -107,7 +115,39 @@ def test_single_tar_suffix_routes_to_x_tar(local_server, tmp_path):
     assert rec.headers["content-type"] == "application/x-tar"
     assert rec.body == tar_bytes  # body streamed intact
     assert rec.headers[SESSION_HEADER] == "sess-1"
+    # x-tar backend extracts into a directory: path must stay "/tmp/", not be
+    # turned into "/tmp/payload.tar" (which the gateway rejects with
+    # "path must be a directory ending with '/'").
+    assert _path_query(rec) == "/tmp/"
     assert result["status"] == "uploaded"
+
+
+def test_single_tar_path_without_trailing_slash_gets_one(local_server, tmp_path):
+    base, client, rec = local_server
+    tar_path = tmp_path / "payload.tar"
+    _make_tar(tar_path)
+
+    client.upload_files(
+        agent_name="test-agent", session_id="sess-1",
+        files=[{"local_file": str(tar_path), "path": "/data"}], path="/tmp/",
+    )
+
+    # tar requires a directory ending with '/'; ensure it is normalized.
+    assert _path_query(rec) == "/data/"
+
+
+def test_single_non_tar_uses_full_file_path(local_server, tmp_path):
+    base, client, rec = local_server
+    plain = tmp_path / "notes.txt"
+    plain.write_bytes(b"plain")
+
+    client.upload_files(
+        agent_name="test-agent", session_id="sess-3",
+        files=[{"local_file": str(plain)}], path="/tmp/",
+    )
+
+    # octet-stream: path is the full remote file path (dir + filename).
+    assert _path_query(rec) == "/tmp/notes.txt"
 
 
 @pytest.mark.parametrize(

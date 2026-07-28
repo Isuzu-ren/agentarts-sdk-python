@@ -940,12 +940,24 @@ class RuntimeClient:
                 filename = _Path(local_file).name
             else:
                 filename = file.get("filename", "file_0")
-            remote_path = file.get("path") or f"{path}{filename}"
+            is_tar = is_tar_payload(local_file, content, file.get("filename"))
+
+            if is_tar:
+                # The x-tar backend extracts the archive into `path`, which must
+                # be a directory ending with '/'. Do NOT append the filename:
+                # entry names live inside the tar, and a file path like
+                # /tmp/x.tar is rejected with "path must be a directory ending
+                # with '/'". octet-stream instead wants the full file path.
+                remote_path = file.get("path") or path
+                if not remote_path.endswith("/"):
+                    remote_path += "/"
+            else:
+                remote_path = file.get("path") or f"{path}{filename}"
 
             api_endpoint = f"/runtimes/{agent_name}/upload-files"
             headers: dict[str, str] = {
                 SESSION_HEADER: session_id,
-                "Content-Type": upload_content_type(local_file, content, file.get("filename")),
+                "Content-Type": "application/x-tar" if is_tar else "application/octet-stream",
             }
             if bearer_token:
                 headers["Authorization"] = f"Bearer {bearer_token}"
