@@ -1,12 +1,76 @@
 """Unit tests for RuntimeClient new methods"""
 
+import tarfile
 import tempfile
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from agentarts.sdk.service.runtime_client import RuntimeClient, StreamDownloadResult
+from agentarts.sdk.service.runtime_client import (
+    RuntimeClient,
+    StreamDownloadResult,
+    is_tar_payload,
+    upload_content_type,
+)
+
+
+class TestTarDetection:
+    """Direct tests for the module-level tar / content-type helpers."""
+
+    @staticmethod
+    def _make_tar(path: Path, fmt: int = tarfile.USTAR_FORMAT) -> None:
+        with tarfile.open(path, "w", format=fmt) as t:
+            data = b"hello tar"
+            info = tarfile.TarInfo("inside.txt")
+            info.size = len(data)
+            t.addfile(info, BytesIO(data))
+
+    def test_suffix_detected(self, tmp_path):
+        p = tmp_path / "payload.tar"
+        p.write_bytes(b"\x00" * 10)
+        assert is_tar_payload(local_file=str(p)) is True
+        assert upload_content_type(local_file=str(p)) == "application/x-tar"
+
+    def test_gnu_magic_without_suffix(self, tmp_path):
+        p = tmp_path / "payload.gnu"
+        self._make_tar(p, fmt=tarfile.GNU_FORMAT)
+        assert is_tar_payload(local_file=str(p)) is True
+        assert upload_content_type(local_file=str(p)) == "application/x-tar"
+
+    def test_pax_magic_without_suffix(self, tmp_path):
+        p = tmp_path / "payload.pax"
+        self._make_tar(p, fmt=tarfile.PAX_FORMAT)
+        assert is_tar_payload(local_file=str(p)) is True
+
+    def test_non_tar_is_octet_stream(self, tmp_path):
+        p = tmp_path / "notes.txt"
+        p.write_bytes(b"plain text")
+        assert is_tar_payload(local_file=str(p)) is False
+        assert upload_content_type(local_file=str(p)) == "application/octet-stream"
+
+    def test_compressed_tarball_not_misdetected(self, tmp_path):
+        import gzip
+
+        p = tmp_path / "payload.tar.gz"
+        with gzip.open(p, "wb") as fh:
+            fh.write(b"not a raw tar")
+        assert is_tar_payload(local_file=str(p)) is False
+        assert upload_content_type(local_file=str(p)) == "application/octet-stream"
+
+    def test_in_memory_tar_content(self, tmp_path):
+        p = tmp_path / "real.tar"
+        self._make_tar(p)
+        content = p.read_bytes()
+        assert is_tar_payload(content=content) is True
+        assert upload_content_type(content=content) == "application/x-tar"
+
+    def test_short_content_is_not_tar(self):
+        # b"hello" (5 bytes) is what the v11 signing tests upload; must stay
+        # octet-stream so those wire-level signing assertions still hold.
+        assert is_tar_payload(content=b"hello", filename="f.txt") is False
+        assert upload_content_type(content=b"hello", filename="f.txt") == "application/octet-stream"
 
 
 class TestRuntimeClientExecCommand:
@@ -163,6 +227,73 @@ class TestRuntimeClientUploadFiles:
             assert headers.get("Content-Type") == "application/octet-stream"
             params = call_kwargs.get("params", {})
             assert params.get("path") == "/home/user/test.txt"
+        finally:
+            Path(tmp_path).unlink()
+
+    @staticmethod
+    def _make_tar(path: str) -> None:
+        with tarfile.open(path, "w") as t:
+            data = b"tar payload"
+            info = tarfile.TarInfo("inside.txt")
+            info.size = len(data)
+            t.addfile(info, BytesIO(data))
+
+    @patch("agentarts.sdk.service.runtime_client.RuntimeClient._data")
+    def test_upload_files_single_tar_uses_x_tar(self, mock_data):
+        with tempfile.NamedTemporaryFile(suffix=".tar", delete=False) as tmp:
+            tmp_path = tmp.name
+        self._make_tar(tmp_path)
+
+        try:
+            mock_result = MagicMock()
+            mock_result.success = True
+            mock_result.status_code = 200
+            mock_result.data = {"status": "uploaded"}
+            mock_data.return_value = mock_result
+
+            client = RuntimeClient(data_endpoint="https://test.example.com")
+            client.upload_files(
+                agent_name="test-agent",
+                session_id="session-123",
+                files=[{"local_file": tmp_path}],
+                path="/tmp/",
+            )
+
+            call_kwargs = mock_data.call_args.kwargs
+            headers = call_kwargs.get("headers", {})
+            # tar must go on the dedicated application/x-tar channel; sending it
+            # as application/octet-stream makes the gateway reset the connection
+            # and the real server error is masked by an SSL EOF.
+            assert headers.get("Content-Type") == "application/x-tar"
+        finally:
+            Path(tmp_path).unlink()
+
+    @patch("agentarts.sdk.service.runtime_client.RuntimeClient._data")
+    def test_upload_files_tar_by_magic_bytes_without_extension(self, mock_data):
+        # A real tar whose filename lacks the .tar suffix must still be detected
+        # via the ustar magic at offset 257.
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = tmp.name
+        self._make_tar(tmp_path)
+
+        try:
+            mock_result = MagicMock()
+            mock_result.success = True
+            mock_result.status_code = 200
+            mock_result.data = {"status": "uploaded"}
+            mock_data.return_value = mock_result
+
+            client = RuntimeClient(data_endpoint="https://test.example.com")
+            client.upload_files(
+                agent_name="test-agent",
+                session_id="session-123",
+                files=[{"local_file": tmp_path}],
+                path="/tmp/",
+            )
+
+            call_kwargs = mock_data.call_args.kwargs
+            headers = call_kwargs.get("headers", {})
+            assert headers.get("Content-Type") == "application/x-tar"
         finally:
             Path(tmp_path).unlink()
 

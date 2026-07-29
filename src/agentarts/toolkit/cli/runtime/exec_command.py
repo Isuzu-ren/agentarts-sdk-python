@@ -42,11 +42,16 @@ def exec_command_cmd(
     """
     Execute command in runtime (cloud only).
 
-    The command can be a simple string like 'ls' or 'ls -la'.
-    It will be parsed as a command array when sent to backend.
+    The backend runs the command as a Docker exec-form JSON array (no shell),
+    so shell operators (>, |, ;, &&, $(), ...) are NOT interpreted by default.
+    When such operators are present (outside quotes), this command auto-wraps
+    the command as ["sh", "-c", "<command>"] so the shell interprets them.
+    Quote metacharacters (e.g. 'echo "a > b"') to pass them through literally.
+    To force a shell yourself, write 'sh -c \"...\"' explicitly.
 
     Examples:
         agentarts runtime exec-command "ls -la" --agent myagent --session <session-id>
+        agentarts runtime exec-command "echo 1214 > file.txt" --agent myagent --session <session-id>
         agentarts runtime exec-command "ls -la" --agent myagent --session <session-id> --chunked
         agentarts runtime exec-command "ls" --agent myagent --session <session-id> -bt <bearer-token>
         agentarts runtime exec-command "ls" --agent myagent --session <session-id> -e myendpoint

@@ -1,5 +1,6 @@
 """Runtime exec-command operation"""
 
+import logging
 import shlex
 from collections.abc import Iterator
 from typing import Any
@@ -9,8 +10,73 @@ from agentarts.sdk.service.runtime_client import RuntimeClient
 from agentarts.toolkit.operations.runtime.invoke import _get_data_endpoint, _resolve_agent_info
 from agentarts.toolkit.utils.common import echo_error
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_TIMEOUT = 60
 MAX_TIMEOUT = 3600
+
+# Shell-only operators that the backend's exec-form (Docker JSON-array) cannot
+# interpret: when present *outside quotes*, the command is meant for a shell, so
+# we wrap it as ["sh", "-c", "<original string>"] and let sh re-parse quotes /
+# redirection / pipes consistently. Glob chars (* ? [) are deliberately NOT here
+# — a bare * is ambiguous (literal pattern vs glob); leave that to --shell.
+_SHELL_OPERATOR_CHARS = "><|;&`"
+
+
+def _needs_shell(command: str) -> bool:
+    """Return True if ``command`` uses shell-only constructs outside quotes.
+
+    Scans with single/double-quote and backslash-escape awareness so that
+    quoted metacharacters (e.g. ``echo "a > b"``) do not trigger a wrap.
+    """
+    i, n = 0, len(command)
+    while i < n:
+        c = command[i]
+        if c == "'":
+            # single-quoted: no escaping, ends at next '
+            i += 1
+            while i < n and command[i] != "'":
+                i += 1
+            i += 1  # skip closing quote (or run to end)
+            continue
+        if c == '"':
+            i += 1
+            while i < n:
+                if command[i] == "\\" and i + 1 < n:
+                    i += 2
+                    continue
+                if command[i] == '"':
+                    break
+                i += 1
+            i += 1
+            continue
+        if c == "\\":  # unquoted escape: skip next char
+            i += 2
+            continue
+        if c in _SHELL_OPERATOR_CHARS:
+            return True
+        if c == "$" and i + 1 < n and command[i + 1] == "(":
+            return True  # $(...) command substitution
+        i += 1
+    return False
+
+
+def build_command_array(command: str) -> list[str]:
+    """Turn a command string into the argv the backend exec-form expects.
+
+    - Plain command -> ``shlex.split`` -> exec-form array (Docker exec-form).
+    - Shell constructs (redirection/pipe/``&&``/``;``/``$()``/backtick, outside
+      quotes) -> ``["sh", "-c", command]`` using the *original* string so sh
+      re-parses quotes and operators consistently. (Note: ``sh -c`` only treats
+      its first arg as the script, so the array must be exactly these three.)
+    """
+    if _needs_shell(command):
+        logger.info("exec-command: command contains shell operators; wrapping as sh -c %r", command)
+        return ["sh", "-c", command]
+    parts = shlex.split(command)
+    if not parts:
+        raise ValueError("Command cannot be empty")
+    return parts
 
 
 def exec_runtime_command(
@@ -46,9 +112,8 @@ def exec_runtime_command(
     if not command:
         raise ValueError("Command is required")
 
-    command_array = shlex.split(command)
-    if not command_array:
-        raise ValueError("Command cannot be empty")
+    command_array = build_command_array(command)
+
 
     if timeout <= 0:
         raise ValueError(f"Timeout must be a positive number: {timeout}")

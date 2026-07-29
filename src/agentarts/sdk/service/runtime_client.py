@@ -49,6 +49,55 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+_TAR_MAGIC_OFFSET = 257
+_TAR_MAGIC = b"ustar"
+
+
+def is_tar_payload(
+    local_file: str | None = None,
+    content: Any = None,
+    filename: str | None = None,
+) -> bool:
+    """Detect a tar payload by ``.tar`` suffix or the ``ustar`` magic at offset 257.
+
+    The backend serves tar uploads on a dedicated ``application/x-tar``
+    channel. Sending a tar with ``application/octet-stream`` makes the
+    gateway tear the connection down before the server can emit a clean
+    error, which surfaces as a low-level ``ssl.SSLError`` rather than the
+    real business error (e.g. "no session").
+    """
+    name = (local_file or filename or "")
+    if name.lower().endswith(".tar"):
+        return True
+
+    # Inspect the ustar magic at offset 257. For an in-memory payload we
+    # already hold the bytes; for a local file we read only the 5 magic
+    # bytes to avoid slurping a large file into memory.
+    payload = content
+    if payload is None and local_file:
+        try:
+            with open(local_file, "rb") as tf:
+                tf.seek(_TAR_MAGIC_OFFSET)
+                payload = tf.read(len(_TAR_MAGIC))
+        except OSError:
+            return False
+        return payload == _TAR_MAGIC
+
+    if isinstance(payload, str):
+        payload = payload.encode("utf-8")
+    if isinstance(payload, bytes) and len(payload) >= _TAR_MAGIC_OFFSET + len(_TAR_MAGIC):
+        return payload[_TAR_MAGIC_OFFSET:_TAR_MAGIC_OFFSET + len(_TAR_MAGIC)] == _TAR_MAGIC
+    return False
+
+
+def upload_content_type(
+    local_file: str | None = None,
+    content: Any = None,
+    filename: str | None = None,
+) -> str:
+    """Content-Type the data plane expects for an upload payload."""
+    return "application/x-tar" if is_tar_payload(local_file, content, filename) else "application/octet-stream"
+
 
 @dataclass
 class StreamDownloadResult:
@@ -891,12 +940,24 @@ class RuntimeClient:
                 filename = _Path(local_file).name
             else:
                 filename = file.get("filename", "file_0")
-            remote_path = file.get("path") or f"{path}{filename}"
+            is_tar = is_tar_payload(local_file, content, file.get("filename"))
+
+            if is_tar:
+                # The x-tar backend extracts the archive into `path`, which must
+                # be a directory ending with '/'. Do NOT append the filename:
+                # entry names live inside the tar, and a file path like
+                # /tmp/x.tar is rejected with "path must be a directory ending
+                # with '/'". octet-stream instead wants the full file path.
+                remote_path = file.get("path") or path
+                if not remote_path.endswith("/"):
+                    remote_path += "/"
+            else:
+                remote_path = file.get("path") or f"{path}{filename}"
 
             api_endpoint = f"/runtimes/{agent_name}/upload-files"
             headers: dict[str, str] = {
                 SESSION_HEADER: session_id,
-                "Content-Type": "application/octet-stream",
+                "Content-Type": "application/x-tar" if is_tar else "application/octet-stream",
             }
             if bearer_token:
                 headers["Authorization"] = f"Bearer {bearer_token}"
@@ -959,12 +1020,12 @@ class RuntimeClient:
                     if local_file:
                         filename = local_file.split("\\")[-1] if "\\" in local_file else local_file.split("/")[-1]
                         f = stack.enter_context(open(local_file, "rb"))
-                        multipart_files.append(("file", (filename, f, "application/octet-stream")))
+                        multipart_files.append(("file", (filename, f, upload_content_type(local_file, None, filename))))
                     else:
                         content = file_spec.get("content")
                         filename = file_spec.get("filename", f"file_{i}")
                         if isinstance(content, bytes):
-                            multipart_files.append(("file", (filename, content, "application/octet-stream")))
+                            multipart_files.append(("file", (filename, content, upload_content_type(None, content, filename))))
                         else:
                             multipart_files.append(("file", (filename, str(content).encode("utf-8"), "text/plain")))
 

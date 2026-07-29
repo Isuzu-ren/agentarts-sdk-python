@@ -19,7 +19,7 @@ resolution-markers = [
 
 [[package]]
 name = "agentarts-sdk"
-version = "0.1.4"
+version = "0.1.4dev072801"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
