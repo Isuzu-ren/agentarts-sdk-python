@@ -131,6 +131,13 @@ class AsyncMemorySession:
         """Get region name."""
         return self._region_name
 
+    async def delete(self) -> None:
+        """Delete this session (soft delete) - identical to sync version."""
+        logger.info(f"Deleting session: {self.session_id} in space: {self.space_id}")
+        await self._async_data_plane.delete_session(self.space_id, self.session_id)
+        logger.info(f"Session deleted: {self.session_id}")
+        logger.info("After deletion, this session object should not be used for further operations.")
+
     # ==================== Message Management (Async) ====================
 
     async def get_last_k_messages(
