@@ -112,9 +112,8 @@ class _DataPlane:
             msg = "session_id is required for delete operation"
             raise ValueError(msg)
 
-        logger.info(f"Deleting session: {session_id} in space: {space_id}")
         self.client.delete_session(space_id, session_id)
-        logger.info(f"Session deleted: {session_id}")
+        logger.info(f"Session deleted: {session_id} in space: {space_id}")
 
     def add_messages(
             self,
