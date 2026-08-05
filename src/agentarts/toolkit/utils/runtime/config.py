@@ -232,6 +232,10 @@ class StorageConfig(BaseModel):
         default_factory=SfsTurboConfig,
         description="SFS Turbo storage configuration",
     )
+    session_storage_mount_path: str | None = Field(
+        default=None,
+        description="Session storage mount path in the container",
+    )
 
     model_config = {
         "extra": "allow",
@@ -242,15 +246,17 @@ class StorageConfig(BaseModel):
 
         The API expects ``sfs_turbo`` as an **array** of config objects
         (not a single object). This method wraps the single config object
-        in a list. Returns ``{}`` when SFS is not configured (no sfs_turbo_id).
+        in a list. Returns ``{}`` when nothing is configured.
         """
+        result: dict[str, Any] = {}
         st = self.sfs_turbo
-        if st is None or not st.sfs_turbo_id:
-            return {}
-        item = st.to_dict()
-        if not item:
-            return {}
-        return {"sfs_turbo": [item]}
+        if st is not None and st.sfs_turbo_id:
+            item = st.to_dict()
+            if item:
+                result["sfs_turbo"] = [item]
+        if self.session_storage_mount_path is not None:
+            result["session_storage_mount_path"] = self.session_storage_mount_path
+        return result
 
 
 class NetworkConfig(BaseModel):
