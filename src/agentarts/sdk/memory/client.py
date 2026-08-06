@@ -513,6 +513,22 @@ class MemoryClient:
         """
         self._data_plane.delete_session(space_id, session_id)
 
+    def get_session(self, space_id: str, session_id: str) -> SessionInfo:
+        """
+        Get session details.
+
+        Args:
+            space_id: Space ID
+            session_id: Session ID
+
+        Returns:
+            SessionInfo: Session details
+
+        Examples:
+            >>> session_info = client.get_session("space-123", "session-456")
+        """
+        return self._data_plane.get_session(space_id, session_id)
+
     # ==================== Data Plane - Message Management ====================
 
     def get_last_k_messages(
