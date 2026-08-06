@@ -7,23 +7,30 @@ generate map links, and recall long-term user preferences.
 ## Architecture
 
 ```
-[User input] -> [LangGraph agent (LLM + tools)]
-                    |                 |
-              tool_calls?          no tool_calls
-                    v                 v
-              [ToolNode] <--- loop --  [reply]
-                    |
-     geocode_address / search_poi / plan_route / generate_map_link / recall_memory
-                    |
-         [AMap API] / [AgentArts Memory search]
+[User input] -> [Auto-Recall] -> [LangGraph agent (LLM + tools)]
+                     |               |                 |
+                Store.search    tool_calls?          no tool_calls
+                     |               v                 v
+              [AgentArts        [ToolNode] <--- loop --  [reply]
+               Memory Store]         |
+                              geocode_address / search_poi / plan_route
+                              / generate_map_link / recall_memory
+                                      |
+                          [AMap API] / [AgentArts Memory search]
 ```
 
 - **Short-term memory**: `AgentArtsMemorySessionSaver` checkpointer
   persists conversation state to AgentArts Memory. The backend
   auto-extracts memories using four builtin strategies (semantic,
   episodic, user_preference, summary).
-- **Long-term recall**: the `recall_memory` tool performs semantic
-  search over extracted memories when the LLM needs historical context.
+- **Long-term recall (hybrid)**: 
+  - *Auto-injection*: the `auto_recall` node searches `AgentArtsMemoryStore` (LangGraph Store)
+    before each LLM call, injecting top-K relevant memories into the system prompt
+    automatically. Zero tool-call latency for common preferences.
+  - *On-demand tool*: the `recall_memory` tool for deeper or more specific queries
+    beyond what was auto-injected.
+  - This hybrid pattern (Store auto-injection + on-demand tool) aligns with LangGraph's
+    recommended best practice for long-term memory integration.
 - **Navigation**: AMap (Gaode) Web Service API for POI search and
   route planning. Falls back to mock data when `AMAP_KEY` is not set.
 
@@ -113,9 +120,9 @@ agent: [calls recall_memory] You mentioned: you prefer highway routes.
 | `config.py` | Env vars, constants, shared config |
 | `setup_memory.py` | One-time: create memory space |
 | `amap_tools.py` | AMap API wrappers (geocode_address, search_poi, plan_route, generate_map_link) |
-| `memory_tools.py` | recall_memory tool (semantic search) |
+| `memory_tools.py` | recall_memory tool (on-demand deep semantic search) |
 | `session_manager.py` | Multi-session management (create/resume/list) |
-| `nav_agent.py` | LangGraph agent + interactive CLI/TUI |
+| `nav_agent.py` | LangGraph agent (auto_recall node + LLM + tools) + CLI/TUI |
 | `tui_app.py` | Textual TUI interface |
 | `tui_encoding.py` | Windows UTF-8 compatibility |
 | `cli_flags.py` | Shared DEBUG flag |
@@ -127,4 +134,7 @@ agent: [calls recall_memory] You mentioned: you prefer highway routes.
 - `VERIFY_SSL` defaults to `true`. Set to `false` in `.env` for internal network environments with self-signed certs.
 - Sessions are created on demand at agent startup; metadata is stored locally
   in `sessions.json` so previous conversations can be resumed.
-- Backend memory extraction runs on a ~30s idle timer; wait before testing `recall_memory`.
+- Backend memory extraction runs on a ~30s idle timer; wait before testing `recall_memory`
+  or expecting auto-injected memories to appear in new sessions.
+- Auto-recall can be disabled by setting `AUTO_RECALL_ENABLED = False` in `config.py`
+  (useful for comparison testing or debugging).

@@ -5,6 +5,12 @@ Exposes a single LangChain tool, recall_memory, that performs
 semantic search over the AgentArts Memory service to retrieve
 long-term memories (user preferences, historical facts, etc.).
 
+This is the ON-DEMAND component of the hybrid recall architecture.
+The AUTO-INJECTION component is the auto_recall node in nav_agent.py,
+which searches AgentArtsMemoryStore before each LLM call and injects
+relevant memories into the system prompt. recall_memory is for deeper
+or more specific queries beyond the auto-injected context.
+
 No save_memory tool is needed: the AgentArtsMemorySessionSaver
 checkpointer persists all conversation messages, and the backend's
 builtin strategies auto-extract memories (semantic, episodic,
@@ -36,11 +42,12 @@ def set_current_session(session_id: str):
 
 @tool
 def recall_memory(query: str) -> str:
-    """Retrieve relevant long-term memories via semantic search.
+    """Deep recall of specific long-term memories via semantic search.
 
-    Call this when you need to recall the user's preferences, past
-    destinations, or historical interaction context. Do NOT call this
-    every turn - only when the user references preferences or history.
+    Relevant memories are already auto-injected each turn via the Store
+    (see [Memory Context] in the system prompt). Only call this tool when
+    you need MORE DETAIL than what was auto-injected, or when searching for
+    a specific past event or preference.
 
     Args:
         query: Natural language description of what to recall,

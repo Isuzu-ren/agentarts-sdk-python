@@ -266,6 +266,7 @@ class NavAgentApp(App):
         self._debug = debug
         self._agent = None
         self._checkpointer = None
+        self._store = None
         self._thread_config = None
         self._session_id = None
         self._session_title = None
@@ -436,7 +437,7 @@ class NavAgentApp(App):
         """Build the LangGraph agent."""
         from nav_agent import build_agent
 
-        self._agent, self._checkpointer = build_agent()
+        self._agent, self._checkpointer, self._store = build_agent()
         self._thread_config = {
             "configurable": {
                 "thread_id": self._session_id,
@@ -541,5 +542,11 @@ class NavAgentApp(App):
         if self._checkpointer:
             try:
                 self._checkpointer.close()
+            except Exception:
+                pass
+
+        if self._store:
+            try:
+                self._store.close()
             except Exception:
                 pass

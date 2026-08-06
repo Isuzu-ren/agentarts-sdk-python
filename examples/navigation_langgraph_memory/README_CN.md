@@ -5,19 +5,23 @@
 ## 架构
 
 ```
-[用户输入] -> [LangGraph agent (LLM + tools)]
-                    |                 |
-              tool_calls?          no tool_calls
-                    v                 v
-              [ToolNode] <--- loop --  [回复]
-                    |
-     geocode_address / search_poi / plan_route / generate_map_link / recall_memory
-                    |
-         [高德地图 API] / [AgentArts Memory 搜索]
+[用户输入] -> [Auto-Recall] -> [LangGraph agent (LLM + tools)]
+                     |               |                 |
+                Store.search    tool_calls?          no tool_calls
+                     |               v                 v
+              [AgentArts        [ToolNode] <--- loop --  [回复]
+               Memory Store]         |
+                              geocode_address / search_poi / plan_route
+                              / generate_map_link / recall_memory
+                                      |
+                          [高德地图 API] / [AgentArts Memory 搜索]
 ```
 
 - **短期记忆**：`AgentArtsMemorySessionSaver` 检查点将对话状态持久化到 AgentArts Memory。后端使用四种内置策略（语义、情景、用户偏好、摘要）自动提取记忆。
-- **长期召回**：`recall_memory` 工具在 LLM 需要历史上下文时，对提取的记忆执行语义搜索。
+- **长期召回（混合模式）**：
+  - *自动注入*：`auto_recall` 节点在每次 LLM 调用前搜索 `AgentArtsMemoryStore`（LangGraph Store），将最相关的 Top-K 记忆自动注入系统提示词。常见偏好无需工具调用，零延迟。
+  - *按需工具*：`recall_memory` 工具用于超出自动注入范围的更深层或更具体的查询。
+  - 此混合模式（Store 自动注入 + 按需工具）符合 LangGraph 推荐的长期记忆集成最佳实践。
 - **导航**：使用高德地图 Web Service API 进行 POI 搜索和路线规划。未设置 `AMAP_KEY` 时回退到模拟数据。
 
 ## 前置条件
@@ -104,9 +108,9 @@ agent: [调用 recall_memory] 您提到过：您偏好高速路线。
 | `config.py` | 环境变量、常量、共享配置 |
 | `setup_memory.py` | 一次性：创建记忆空间 |
 | `amap_tools.py` | 高德地图 API 封装（geocode_address、search_poi、plan_route、generate_map_link） |
-| `memory_tools.py` | recall_memory 工具（语义搜索） |
+| `memory_tools.py` | recall_memory 工具（按需深度语义搜索） |
 | `session_manager.py` | 多会话管理（创建/恢复/列表） |
-| `nav_agent.py` | LangGraph agent + 交互式 CLI/TUI |
+| `nav_agent.py` | LangGraph agent（auto_recall 节点 + LLM + 工具）+ CLI/TUI |
 | `tui_app.py` | Textual TUI 界面 |
 | `tui_encoding.py` | Windows UTF-8 兼容性 |
 | `cli_flags.py` | 共享 DEBUG 标志 |
@@ -117,4 +121,5 @@ agent: [调用 recall_memory] 您提到过：您偏好高速路线。
 
 - `VERIFY_SSL` 默认为 `true`。对于使用自签名证书的内网环境，在 `.env` 中设置为 `false`。
 - 会话在 Agent 启动时按需创建；元数据存储在本地 `sessions.json` 中，以便恢复之前的对话。
-- 后端记忆提取在约 30 秒空闲计时器后运行；测试 `recall_memory` 前请等待。
+- 后端记忆提取在约 30 秒空闲计时器后运行；测试 `recall_memory` 或期望新会话中出现自动注入的记忆前，请先等待。
+- 可通过在 `config.py` 中设置 `AUTO_RECALL_ENABLED = False` 来禁用自动召回（用于对比测试或调试）。

@@ -9,8 +9,11 @@ A local interactive navigation assistant that can:
 
 Conversation state is persisted through AgentArtsMemorySessionSaver
 (native SDK LangGraph checkpointer). The backend auto-extracts
-memories using the four builtin strategies; the recall_memory tool
-provides active semantic search for historical context.
+memories using the four builtin strategies. Long-term recall uses a
+hybrid approach: an auto_recall node searches AgentArtsMemoryStore
+(SDK LangGraph Store) before each LLM call to inject relevant memories,
+and the recall_memory tool provides on-demand deep search for specific
+queries beyond the auto-injected context.
 
 Prerequisites:
   1. Install dependencies:
@@ -68,15 +71,29 @@ def build_agent():
     """Build and compile the LangGraph navigation agent."""
     # Imports are deferred so _check_env() runs first and fails fast
     # without importing heavy modules.
-    from langchain_core.messages import SystemMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
     from langchain_openai import ChatOpenAI
     from langgraph.graph import END, MessagesState, START, StateGraph
     from langgraph.prebuilt import ToolNode
+    from langgraph.store.base import BaseStore
 
-    from agentarts.sdk.integration.langgraph import AgentArtsMemorySessionSaver
+    from agentarts.sdk.integration.langgraph import (
+        AgentArtsMemorySessionSaver,
+        AgentArtsMemoryStore,
+    )
 
     from amap_tools import generate_map_link, geocode_address, plan_route, search_poi
     from memory_tools import recall_memory
+
+    class NavAgentState(MessagesState):
+        """State with memory_context for auto-injected long-term memories.
+
+        memory_context holds formatted memory text from the auto_recall
+        node. It uses the default (replace) reducer: each auto_recall
+        invocation overwrites the previous value.
+        """
+
+        memory_context: str
 
     SYSTEM_PROMPT = """\
 You are a navigation assistant that helps users find places and plan routes.
@@ -90,8 +107,9 @@ Available tools:
 - plan_route: Plan a route (driving/walking/riding/transit). Supports
   waypoints for driving and requires city for transit.
 - generate_map_link: Generate a map visualization URL for locations
-- recall_memory: Recall user preferences and history (only call when the
-  user references past preferences or history; do NOT call every turn)
+- recall_memory: Deep recall tool for specific historical queries.
+  Relevant memories are auto-injected each turn (see [Memory Context]).
+  Only call this tool when you need details BEYOND the auto-injected context.
 
 Rules:
 - Coordinates use "longitude,latitude" format, e.g. "116.481181,39.990021"
@@ -100,7 +118,8 @@ Rules:
 - If the user's location is unknown, ask which city or area they are in
 - When the user expresses a preference (e.g. "I like highways"), respond
   naturally - the memory system saves it automatically
-- Use recall_memory sparingly, only when historical context is needed
+- Use recall_memory only for deep queries beyond the auto-injected
+  [Memory Context]; do NOT call it every turn
 - Present POI options clearly with names and addresses before planning routes
 """
 
@@ -114,24 +133,77 @@ Rules:
     )
     llm_with_tools = llm.bind_tools(all_tools)
 
-    def call_model(state: MessagesState):
-        """Invoke LLM with system prompt and current message state."""
-        messages = [SystemMessage(content=SYSTEM_PROMPT)] + state["messages"]
+    def auto_recall(state: NavAgentState, *, store: BaseStore) -> dict:
+        """Search Store for relevant long-term memories, inject as context.
+
+        Runs before the agent node each turn. Searches the
+        AgentArtsMemoryStore for memories matching the user's latest
+        message, filtered by actor_id (cross-session, user-scoped).
+        Results are stored in state["memory_context"] and appended to
+        the system prompt by call_model. Failures are silent -- the
+        agent continues without memories.
+        """
+        if not config.AUTO_RECALL_ENABLED:
+            return {"memory_context": ""}
+
+        last_msg = state["messages"][-1]
+        if not isinstance(last_msg, HumanMessage):
+            return {"memory_context": ""}
+
+        query = last_msg.content
+        try:
+            items = store.search(
+                (),
+                query=query,
+                filter={"actor_id": config.ACTOR_ID},
+                limit=config.AUTO_RECALL_TOP_K,
+            )
+        except Exception as e:
+            # Graceful degradation: never block the agent
+            import logging
+            logging.getLogger(__name__).warning(
+                f"Auto-recall failed, continuing without memories: {e}")
+            return {"memory_context": ""}
+
+        if not items:
+            return {"memory_context": ""}
+
+        lines = []
+        for item in items:
+            content = item.value.get("content", "")
+            strategy = item.value.get("strategy_type", "")
+            if content:
+                tag = f"[{strategy}] " if strategy else ""
+                lines.append(f"- {tag}{content}")
+
+        if not lines:
+            return {"memory_context": ""}
+        return {"memory_context": "\n".join(lines)}
+
+    def call_model(state: NavAgentState):
+        """Invoke LLM with system prompt, memory context, and message state."""
+        system_content = SYSTEM_PROMPT
+        memory_ctx = state.get("memory_context", "")
+        if memory_ctx:
+            system_content += f"\n\n[Memory Context]\n{memory_ctx}"
+        messages = [SystemMessage(content=system_content)] + state["messages"]
         response = llm_with_tools.invoke(messages)
         return {"messages": [response]}
 
-    def should_continue(state: MessagesState) -> str:
+    def should_continue(state: NavAgentState) -> str:
         """Route to tools node if LLM made tool calls, else end."""
         last = state["messages"][-1]
         if getattr(last, "tool_calls", None):
             return "tools"
         return END
 
-    # Build graph: START -> agent -> (tools?) -> agent/END
-    workflow = StateGraph(MessagesState)
+    # Build graph: START -> auto_recall -> agent -> (tools?) -> agent/END
+    workflow = StateGraph(NavAgentState)
+    workflow.add_node("auto_recall", auto_recall)
     workflow.add_node("agent", call_model)
     workflow.add_node("tools", ToolNode(all_tools))
-    workflow.add_edge(START, "agent")
+    workflow.add_edge(START, "auto_recall")
+    workflow.add_edge("auto_recall", "agent")
     workflow.add_conditional_edges("agent", should_continue)
     workflow.add_edge("tools", "agent")
 
@@ -144,7 +216,14 @@ Rules:
         max_messages=20,
     )
 
-    return workflow.compile(checkpointer=checkpointer), checkpointer
+    # Store: cross-session long-term memory for auto-injection
+    store = AgentArtsMemoryStore(
+        space_id=SPACE_ID,
+        api_key=API_KEY,
+        verify_ssl=VERIFY_SSL,
+    )
+
+    return workflow.compile(checkpointer=checkpointer, store=store), checkpointer, store
 
 
 def main():
@@ -210,7 +289,7 @@ def main_cli():
     print("Type 'quit' / 'exit' to stop.")
     print()
 
-    agent, checkpointer = build_agent()
+    agent, checkpointer, store = build_agent()
 
     from langchain_core.messages import HumanMessage
 
@@ -258,6 +337,7 @@ def main_cli():
         # Update session metadata on exit
         session_manager.update_session(session_id, message_count)
         checkpointer.close()
+        store.close()
         print(f"Session '{session_title}' ended. Conversation saved to AgentArts Memory.")
 
 

@@ -27,7 +27,7 @@ if _env_file.exists():
 # ---------------------------------------------------------------------------
 AGENTARTS_CONTROL_ENDPOINT = os.getenv(
     "AGENTARTS_CONTROL_ENDPOINT",
-    "https://agentarts.myhuaweicloud.com",
+    "https://agentarts.cn-southwest-2.myhuaweicloud.com",
 )
 AGENTARTS_MEMORY_DATA_ENDPOINT = os.getenv("AGENTARTS_MEMORY_DATA_ENDPOINT")
 
@@ -64,3 +64,11 @@ ACTOR_ID = "user-nav-demo"
 ASSISTANT_ID = "nav-agent-demo"
 SPACE_NAME = "memory-nav-agent-demo"
 SPACE_DESCRIPTION = "Navigation agent demo memory space"
+
+# ---------------------------------------------------------------------------
+# Auto-recall configuration (hybrid memory recall)
+# The auto_recall node searches the Store for relevant long-term memories
+# before each LLM call and injects them into the system prompt.
+# ---------------------------------------------------------------------------
+AUTO_RECALL_TOP_K = 3       # max memories to auto-inject per turn
+AUTO_RECALL_ENABLED = True  # toggle auto-injection (for comparison/testing)
