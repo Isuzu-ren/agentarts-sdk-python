@@ -4,9 +4,9 @@
 
 ## 总体信息
 
-- 插件根目录：`agentarts-memory-plugins/agentarts-memory-code_agent/`
-- 组件名：`agentarts-memory-code_agent`
-- 测试目录：`tests/agentarts-memory-code_agent/`
+- 插件根目录：`agentarts-memory-plugins/agentarts-memory-agent/`
+- 组件名：`agentarts-memory-agent`
+- 测试目录：`tests/agentarts-memory-agent/`
 - Python 版本：3.10+（monorepo `requires-python = ">=3.10"`）
 - 代码风格：black(line-length=100)、isort(profile=black)、mypy strict、ruff
 - 架构：Node/TS hooks → 本地 Python FastAPI server(`127.0.0.1:8719`) → AgentArts MemoryClient
@@ -29,15 +29,15 @@
 | `plugin.json` | 顶层元信息 |
 | `pyproject.toml` | 子包构建 |
 | `README.md` / `AGENTS.md` | 文档 |
-| `tests/agentarts-memory-code_agent/test_server.py` | server 路由单测 |
-| `tests/agentarts-memory-code_agent/test_agentarts_client.py` | client 单测 |
-| `tests/agentarts-memory-code_agent/test_scripts.mjs` | hook 脚本单测 |
+| `tests/agentarts-memory-agent/test_server.py` | server 路由单测 |
+| `tests/agentarts-memory-agent/test_agentarts_client.py` | client 单测 |
+| `tests/agentarts-memory-agent/test_scripts.mjs` | hook 脚本单测 |
 
 ---
 
 ## 阶段 1：项目骨架（预计 0.5h）
 
-1.1 创建目录结构（`agentarts-memory-code_agent/` 下全部子目录）
+1.1 创建目录结构（`agentarts-memory-agent/` 下全部子目录）
 1.2 创建 `pyproject.toml`（fastapi/uvicorn/agentarts-sdk 依赖 + console_script）
 1.3 创建 `plugin.json` / `.claude-plugin/plugin.json` / `.codex-plugin/plugin.json` / `opencode/plugin.json`
 1.4 创建 `AGENTS.md` 子包指引
@@ -50,9 +50,9 @@
 2.2 `server/app.py`：FastAPI + 5 路由（/health GET, /add_messages/ /search_memory/
     /list_memories/ /search_summary/ POST），CORS，错误处理
 2.3 `server/run.py`：uvicorn 启动入口，端口 8719
-2.4 编写 `tests/agentarts-memory-code_agent/test_agentarts_client.py`（scope→session 缓存、actor_id 映射、
+2.4 编写 `tests/agentarts-memory-agent/test_agentarts_client.py`（scope→session 缓存、actor_id 映射、
     各方法入参映射，monkeypatch MemoryClient）
-2.5 编写 `tests/agentarts-memory-code_agent/test_server.py`（TestClient 验证各路由）
+2.5 编写 `tests/agentarts-memory-agent/test_server.py`（TestClient 验证各路由）
 2.6 跑测试，失败则修复
 
 ## 阶段 3：Node hook 脚本（预计 1h）
@@ -63,7 +63,7 @@
 3.3 `scripts/prompt-submit.mjs` → add_messages(fire-and-forget) + searchAndFormat → stdout
 3.4 `scripts/pre-compact.mjs` → searchAndFormat → stdout
 3.5 其余 no-op 脚本（post-tool-use/stop/session-end/subagent-*/notification/task-completed/pre-tool-use/post-tool-failure）
-3.6 编写 `tests/agentarts-memory-code_agent/test_scripts.mjs`（mock fetch，验证 stdin→stdout）
+3.6 编写 `tests/agentarts-memory-agent/test_scripts.mjs`（mock fetch，验证 stdin→stdout）
 3.7 跑测试
 
 ## 阶段 4：Hooks 配置（预计 0.3h）

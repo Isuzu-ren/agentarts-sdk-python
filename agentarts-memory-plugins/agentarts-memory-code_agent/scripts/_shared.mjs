@@ -1,4 +1,4 @@
-// agentarts-memory-agent — shared utilities for hook scripts.
+// agentarts-memory-code_agent — shared utilities for hook scripts.
 //
 // All hook scripts import from this module for:
 //   - REST URL / timeout config

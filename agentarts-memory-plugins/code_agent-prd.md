@@ -1,10 +1,10 @@
 # PRD：AgentArts Memory Agent 插件（Claude Code / Codex / OpenCode）
 
-> 组件名：`agentarts-memory-code_agent`　|　测试目录：`tests/agentarts-memory-code_agent/`
+> 组件名：`agentarts-memory-agent`　|　测试目录：`tests/agentarts-memory-agent/`
 
 ## 1. 概述
 
-在 `agentarts-memory-plugins/agentarts-memory-code_agent/` 下构建一个插件，把华为云 AgentArts Memory
+在 `agentarts-memory-plugins/agentarts-memory-agent/` 下构建一个插件，把华为云 AgentArts Memory
 作为 **Claude Code / Codex / OpenCode** 三平台 AI 编程助手的长期记忆后端。架构对齐 Jiuwen
 `jiuwen_memory_code_agent`：**各平台 hook/插件 → 本地 Python HTTP 适配 server →
 AgentArts MemoryClient（云端 SDK）**。
@@ -42,7 +42,7 @@ AgentArts MemoryClient（云端 SDK）**。
 ## 3. 目录结构
 
 ```
-agentarts-memory-plugins/agentarts-memory-code_agent/
+agentarts-memory-plugins/agentarts-memory-agent/
 ├── .claude-plugin/plugin.json     # Claude Code 入口（指向 hooks/hooks.json）
 ├── .codex-plugin/plugin.json      # Codex 入口（指向 hooks/hooks.codex.json）
 ├── hooks/
@@ -78,7 +78,7 @@ agentarts-memory-plugins/agentarts-memory-code_agent/
 ├── README.md
 └── AGENTS.md
 
-tests/agentarts-memory-code_agent/      # 测试用例
+tests/agentarts-memory-agent/      # 测试用例
 ├── test_server.py                 # FastAPI TestClient（mock MemoryClient）
 ├── test_agentarts_client.py       # client 封装/scope→session 缓存单测
 └── test_scripts.mjs               # Node hook 脚本单测（mock fetch）
@@ -127,7 +127,7 @@ tests/agentarts-memory-code_agent/      # 测试用例
 
 ---
 
-## 7. 测试（`tests/agentarts-memory-code_agent/`）
+## 7. 测试（`tests/agentarts-memory-agent/`）
 
 - `test_server.py`：FastAPI `TestClient`，monkeypatch `MemoryClient`，验证各端点入参映射、
   scope→session 缓存、错误处理、`/health`。

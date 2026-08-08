@@ -1,4 +1,4 @@
-// agentarts-memory-agent OpenCode plugin — TypeScript Plugin SDK implementation.
+// agentarts-memory-code_agent OpenCode plugin — TypeScript Plugin SDK implementation.
 //
 // Drop this file into ~/.config/opencode/plugins/ and reference it in
 // ~/.config/opencode/opencode.json:

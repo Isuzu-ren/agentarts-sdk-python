@@ -13,7 +13,7 @@ import os
 import threading
 from typing import Any
 
-logger = logging.getLogger("agentarts_memory_agent.server")
+logger = logging.getLogger("agentarts_memory_code_agent.server")
 
 ENV_AK = "HUAWEICLOUD_SDK_AK"
 ENV_SK = "HUAWEICLOUD_SDK_SK"
@@ -22,7 +22,7 @@ ENV_REGION = "HUAWEICLOUD_SDK_REGION"
 ENV_SPACE_ID = "AGENTARTS_MEMORY_SPACE_ID"
 
 DEFAULT_REGION = "cn-southwest-2"
-DEFAULT_ASSISTANT_ID = "agentarts-memory-agent"
+DEFAULT_ASSISTANT_ID = "agentarts-memory-code_agent"
 DEFAULT_TOP_K = 5
 DEFAULT_LIST_LIMIT = 10
 DEFAULT_MIN_SCORE = 0.3

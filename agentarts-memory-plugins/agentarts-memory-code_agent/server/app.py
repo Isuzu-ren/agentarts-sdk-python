@@ -24,7 +24,7 @@ from .agentarts_client import (
     AgentArtsMemoryClient,
 )
 
-logger = logging.getLogger("agentarts_memory_agent.server")
+logger = logging.getLogger("agentarts_memory_code_agent.server")
 
 # ── single shared client instance ──
 _client: AgentArtsMemoryClient | None = None

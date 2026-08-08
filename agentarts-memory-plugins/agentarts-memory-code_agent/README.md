@@ -1,4 +1,4 @@
-# agentarts-memory-agent
+# agentarts-memory-code_agent
 
 Huawei Cloud **AgentArts Memory** 作为 **Claude Code / Codex / OpenCode** 三平台 AI 编程助手的长期记忆后端。
 
@@ -46,7 +46,7 @@ export HUAWEICLOUD_SDK_REGION="cn-southwest-2"   # 可选，默认 cn-southwest-
 ### 2. 安装适配 server
 
 ```bash
-cd agentarts-memory-plugins/agentarts-memory-agent
+cd agentarts-memory-plugins/agentarts-memory-code_agent
 pip install -e ".[cloud,dev]"   # 需要 agentarts-sdk + fastapi + uvicorn
 ```
 
@@ -169,10 +169,10 @@ cp opencode/commands/remember.md ~/.config/opencode/commands/
 
 ```bash
 # Python server 测试
-pytest tests/agentarts-memory-agent/ -q
+pytest tests/agentarts-memory-code_agent/ -q
 
 # Node hook 脚本测试
-node --test tests/agentarts-memory-agent/test_scripts.mjs
+node --test tests/agentarts-memory-code_agent/test_scripts.mjs
 ```
 
 ## 写入策略
