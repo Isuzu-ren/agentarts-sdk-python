@@ -85,7 +85,8 @@ def handler(payload: dict):
     )
 
     history_dicts = [
-        {"role": msg.role, "content": [message.get('text') for message in msg.parts]} for msg in history
+        {"role": msg.role, "content": [message.get('text') for message in msg.parts]}
+        for msg in history
     ]
 
     return {
