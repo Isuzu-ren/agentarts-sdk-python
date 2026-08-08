@@ -1,0 +1,184 @@
+# agentarts-memory-agent
+
+Huawei Cloud **AgentArts Memory** 作为 **Claude Code / Codex / OpenCode** 三平台 AI 编程助手的长期记忆后端。
+
+一个插件目录同时覆盖三平台，共享同一个本地 HTTP 适配 server + hook 脚本逻辑。
+
+## 它做什么
+
+| 平台 | 接入方式 | hook 数 | 命令 |
+|---|---|---|---|
+| Claude Code | `.claude-plugin/plugin.json` + marketplace | 12 | — |
+| Codex | `.codex-plugin/plugin.json` + marketplace | 6 | — |
+| OpenCode | TypeScript 插件 + opencode.json 配置 | session/message/system 事件 | `/recall` `/remember` |
+
+所有平台共享同一个 `scripts/_shared.mjs`（hook 脚本）和 `opencode/` 下的 TS 插件，只是配置入口不同。所有捕获与注入都调用本地适配 server 的 REST API（`127.0.0.1:8719`），server 再调用云端 AgentArts Memory SDK。
+
+### 数据流
+
+```
+Claude Code / Codex / OpenCode agent loop
+    │
+    ├── hooks / plugin 事件 (生命周期拦截)
+    │   ├── session-start → /health (探测 server)
+    │   ├── prompt-submit → /add_messages/ (后台记录用户 query) + /search_memory/ + /search_summary/ → stdout 注入
+    │   └── pre-compact → /search_memory/ + /search_summary/ → stdout 注入防丢
+    │       │
+    │       └── 本地适配 server (127.0.0.1:8719, FastAPI)
+    │           └── AgentArts MemoryClient → 华为云 AgentArts Memory
+    │
+    └── OpenCode commands (/recall /remember)
+        └── 手动搜索 / 保存记忆
+```
+
+## 前置条件
+
+### 1. 环境变量（云端 SDK 鉴权）
+
+```bash
+export HUAWEICLOUD_SDK_AK="your-access-key"
+export HUAWEICLOUD_SDK_SK="your-secret-key"
+export AGENTARTS_MEMORY_SPACE_ID="your-space-id"
+export HUAWEICLOUD_SDK_MEMORY_API_KEY="your-memory-api-key"
+export HUAWEICLOUD_SDK_REGION="cn-southwest-2"   # 可选，默认 cn-southwest-2
+```
+
+### 2. 安装适配 server
+
+```bash
+cd agentarts-memory-plugins/agentarts-memory-agent
+pip install -e ".[cloud,dev]"   # 需要 agentarts-sdk + fastapi + uvicorn
+```
+
+### 3. 启动适配 server
+
+```bash
+agentarts-memory-server          # 默认 127.0.0.1:8719
+# 或
+python -m server.run
+```
+
+验证：
+
+```bash
+curl http://127.0.0.1:8719/health   # {"status":"healthy",...}
+```
+
+## 安装插件
+
+### Claude Code
+
+```bash
+# 注册 marketplace 后安装
+/plugin install agentarts_memory
+```
+
+hook 配置由 `hooks/hooks.json` 提供（12 个生命周期 hook），使用 `${CLAUDE_PLUGIN_ROOT}` 变量。
+
+### Codex
+
+```bash
+codex plugin marketplace add <repo>
+codex plugin add agentarts_memory
+```
+
+重启 Codex 后生效。Codex 不自动从 manifest 读 hooks，需手动把 `hooks/hooks.codex.json` 合并到 `~/.codex/hooks.json`（修改路径为绝对路径），并在 `~/.codex/config.toml` 启用：
+
+```toml
+[features]
+codex_hooks = true
+```
+
+### OpenCode
+
+1. 拷贝插件文件和命令到 OpenCode 配置目录：
+
+```bash
+mkdir -p ~/.config/opencode/plugins ~/.config/opencode/commands
+cp opencode/agentarts-memory-capture.ts ~/.config/opencode/plugins/
+cp opencode/commands/recall.md ~/.config/opencode/commands/
+cp opencode/commands/remember.md ~/.config/opencode/commands/
+```
+
+2. 在 `~/.config/opencode/opencode.json` 启用插件：
+
+```json
+{
+  "plugin": ["./plugins/agentarts-memory-capture.ts"]
+}
+```
+
+## hooks → 端点映射
+
+### Claude Code hooks（12 个）
+
+| hook | server 端点 | 写入记忆? | stdout 注入? |
+|---|---|---|---|
+| SessionStart | `/health` only | ❌ | ❌ |
+| UserPromptSubmit | `/add_messages/` + `/search_memory/` + `/search_summary/` | ✅（仅用户 query） | ✅ |
+| PreToolUse | no-op placeholder | ❌ | ❌ |
+| PostToolUse / PostToolUseFailure | no-op | ❌ | ❌ |
+| PreCompact | `/search_memory/` + `/search_summary/` | ❌ | ✅ |
+| SubagentStart/Stop, Notification, TaskCompleted, Stop, SessionEnd | no-op | ❌ | ❌ |
+
+### Codex hooks（6 个）
+
+| hook | server 端点 | 写入记忆? | stdout 注入? |
+|---|---|---|---|
+| SessionStart | `/health` only | ❌ | ❌ |
+| UserPromptSubmit | `/add_messages/` + `/search_memory/` + `/search_summary/` | ✅（仅用户 query） | ✅ |
+| PreToolUse / PostToolUse | no-op placeholder | ❌ | ❌ |
+| PreCompact | `/search_memory/` + `/search_summary/` | ❌ | ✅ |
+| Stop | no-op | ❌ | ❌ |
+
+### OpenCode 插件机制
+
+| 钩子 | 作用 | 记忆写入? | 注入? |
+|---|---|---|---|
+| `session.created` | 探测 `/health`，初始化 per-session 状态 | ❌ | ❌ |
+| `session.deleted` | 清理 per-session 缓存 | ❌ | ❌ |
+| `message.updated`（assistant） | AI 回复结束后写入暂存的用户 query | ✅（延后写入） | ❌ |
+| `chat.message` | 存用户 query、标记 pending、阻塞执行一次 search 并缓存 | ❌（延后写入） | ❌ |
+| `experimental.chat.system.transform` | 读取缓存 search 结果注入 `output.system[]` | ❌ | ✅ system prompt |
+| `experimental.session.compacting` | 压缩前注入 `output.context[]`（命中缓存，否则 fallback 搜索） | ❌ | ✅ context |
+
+搜索只在 `chat.message` 阻塞执行一次并缓存，`system.transform`/`compacting` 全程只读缓存、不重复搜索。
+
+## 环境变量（可选覆盖）
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `AGENTARTS_MEMORY_SERVER_URL` | `http://127.0.0.1:8719` | 本地 server 地址（hook/插件端） |
+| `AGENTARTS_MEMORY_USER_ID` | `cc-user`/`codex-user`/`opencode-user` | 记忆隔离 user_id |
+| `AGENTARTS_MEMORY_DEBUG` | `0` | 开调试日志 |
+| `AGENTARTS_MEMORY_PROJECT_NAME` | git toplevel basename | scope_id 覆盖 |
+
+## server API
+
+| 端点 | 方法 | 入参 | 说明 |
+|---|---|---|---|
+| `/health` | GET | — | 配置就绪探测（无网络） |
+| `/add_messages/` | POST | `{messages, user_id, scope_id}` | 按 scope 创建/复用 session 写入 |
+| `/search_memory/` | POST | `{query, num, user_id, scope_id, threshold}` | 语义搜索 |
+| `/list_memories/` | POST | `{limit, offset, user_id, scope_id}` | 列出记忆 |
+| `/search_summary/` | POST | `{query, num, user_id, scope_id, threshold}` | 摘要类记忆检索 |
+
+`scope_id` → AgentArts `session_id`（首次自动创建并缓存），`user_id` → `actor_id`。
+
+## 测试
+
+```bash
+# Python server 测试
+pytest tests/agentarts-memory-agent/ -q
+
+# Node hook 脚本测试
+node --test tests/agentarts-memory-agent/test_scripts.mjs
+```
+
+## 写入策略
+
+只记录**用户 query**（`UserPromptSubmit` / OpenCode `message.updated`），不写 agent 回答/工具结果。`add_messages` fire-and-forget，不阻塞主循环。
+
+## License
+
+Apache-2.0
