@@ -1,6 +1,6 @@
 # agentarts-memory-code_agent
 
-Huawei Cloud **AgentArts Memory** 作为 **Claude Code / Codex / OpenCode** 三平台 AI 编程助手的长期记忆后端。
+**Huawei Cloud AgentArts Memory** 作为 **Claude Code / Codex / OpenCode** 三平台 AI 编程助手的长期记忆后端。
 
 一个插件目录同时覆盖三平台，共享同一个本地 HTTP 适配 server + hook 脚本逻辑。
 
