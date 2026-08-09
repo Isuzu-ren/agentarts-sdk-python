@@ -47,14 +47,14 @@ CONFIG_SCHEMA: list[dict[str, Any]] = [
         "key": "ak",
         "description": "Huawei Cloud Access Key",
         "secret": True,
-        "required": False,
+        "required": True,
         "env_var": ENV_AK,
     },
     {
         "key": "sk",
         "description": "Huawei Cloud Secret Key",
         "secret": True,
-        "required": False,
+        "required": True,
         "env_var": ENV_SK,
     },
     {
