@@ -14,13 +14,15 @@ Hermes Memory Provider 插件，将华为云 AgentArts Memory 作为 Hermes Agen
 
 ## 前置条件
 
-### 环境变量
+1. 安装Hermes（安装教程：https://hermes-agent.nousresearch.com/docs/getting-started/installation）
+2. 创建华为云AgentArts记忆库，获取到区域（`HUAWEICLOUD_SDK_REGION`）、记忆库 ID（`AGENTARTS_MEMORY_SPACE_ID`）、API Key（`HUAWEICLOUD_SDK_MEMORY_API_KEY`）
 
-| 变量 | 说明 |
-|---|---|
-| `HUAWEICLOUD_SDK_MEMORY_API_KEY` | AgentArts Memory 数据面 API Key |
-| `HUAWEICLOUD_SDK_REGION` | 华为云区域（默认 `cn-southwest-2`） |
-| `AGENTARTS_MEMORY_SPACE_ID` | 记忆空间 ID |
+| 参数                             | 说明                        |
+|----------------------------------|----------------------------|
+| `AGENTARTS_MEMORY_SPACE_ID`      | AgentArts 记忆库ID          |
+| `HUAWEICLOUD_SDK_MEMORY_API_KEY` | AgentArts 记忆库API Key     |
+| `HUAWEICLOUD_SDK_REGION`         | 区域（默认 `cn-southwest-2`）|
+
 
 ## 安装
 

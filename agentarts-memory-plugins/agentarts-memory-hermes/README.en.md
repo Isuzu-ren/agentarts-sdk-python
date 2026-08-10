@@ -5,7 +5,7 @@ A Hermes Memory Provider plugin that uses Huawei Cloud AgentArts Memory as the l
 ## Overview
 
 - **Cross-session memory persistence**: Automatically writes conversation content to AgentArts Memory after each turn (non-blocking)
-- **Context injection**: Injects relevant memories before each LLM call (user profile / episodic / semantic + history summary)
+- **Context injection**: Automatically injects relevant memories before each LLM call (user profile / episodic / semantic + history summary)
 - **Compression protection**: Re-injects relevant memories before context compression to prevent key information from being dropped
 - **MEMORY.md mirroring**: Syncs Hermes built-in `MEMORY.md` writes to AgentArts
 - **Active retrieval tools**:
@@ -14,13 +14,14 @@ A Hermes Memory Provider plugin that uses Huawei Cloud AgentArts Memory as the l
 
 ## Prerequisites
 
-### Environment Variables
+1. Install Hermes (installation guide: https://hermes-agent.nousresearch.com/docs/getting-started/installation)
+2. Create a Huawei Cloud AgentArts memory space, and obtain the region (`HUAWEICLOUD_SDK_REGION`), memory space ID (`AGENTARTS_MEMORY_SPACE_ID`), and API Key (`HUAWEICLOUD_SDK_MEMORY_API_KEY`)
 
-| Variable | Description |
-|---|---|
-| `HUAWEICLOUD_SDK_MEMORY_API_KEY` | AgentArts Memory data plane API Key |
-| `HUAWEICLOUD_SDK_REGION` | Huawei Cloud region (default `cn-southwest-2`) |
-| `AGENTARTS_MEMORY_SPACE_ID` | Memory space ID |
+| Parameter                       | Description                        |
+|---------------------------------|------------------------------------|
+| `AGENTARTS_MEMORY_SPACE_ID`     | AgentArts memory space ID          |
+| `HUAWEICLOUD_SDK_MEMORY_API_KEY`| AgentArts memory space API Key     |
+| `HUAWEICLOUD_SDK_REGION`        | Region (default `cn-southwest-2`)  |
 
 ## Installation
 
