@@ -18,8 +18,6 @@ Hermes Memory Provider 插件，将华为云 AgentArts Memory 作为 Hermes Agen
 
 | 变量 | 说明 |
 |---|---|
-| `HUAWEICLOUD_SDK_AK` | 华为云 Access Key |
-| `HUAWEICLOUD_SDK_SK` | 华为云 Secret Key |
 | `HUAWEICLOUD_SDK_MEMORY_API_KEY` | AgentArts Memory 数据面 API Key |
 | `HUAWEICLOUD_SDK_REGION` | 华为云区域（默认 `cn-southwest-2`） |
 | `AGENTARTS_MEMORY_SPACE_ID` | 记忆空间 ID |
@@ -47,11 +45,9 @@ cp -r agentarts-memory-hermes ~/.hermes/plugins/
 
 通过 `hermes plugins` 交互式配置，或手动设置上述环境变量。 按提示选择 `agentarts_memory` 并完成配置。
 
-
-
 ## 配置
-配置过程中会提示输入 API Key、AK/SK、Space ID 等。敏感字段写入 `.env`，非敏感配置写入 `$HERMES_HOME/agentarts.json`。
-非敏感配置（`space_id`、`region`）写入 `$HERMES_HOME/agentarts.json`，敏感字段（API Key、AK/SK）写入 `.env`。
+
+配置过程中会提示输入 API Key、Space ID 等。敏感字段（API Key）写入 `.env`，非敏感配置（`space_id`、`region`）写入 `$HERMES_HOME/agentarts.json`。
 
 ## 工具说明
 
@@ -110,10 +106,9 @@ AgentArts Memory 从对话消息生成记忆需要时间（约 30 秒）。`sync
 ### 认证失败？
 
 检查：
-1. AK/SK 是否正确配置
-2. API Key 是否有效
-3. 区域配置是否正确
-4. Space 状态是否为 `running`
+1. API Key 是否有效
+2. 区域配置是否正确
+3. Space 状态是否为 `running`
 
 ## 开发
 

@@ -19,10 +19,8 @@ from provider import (
     DEFAULT_LIST_LIMIT,
     DEFAULT_REGION,
     DEFAULT_TOP_K,
-    ENV_AK,
     ENV_API_KEY,
     ENV_REGION,
-    ENV_SK,
     ENV_SPACE_ID,
     TOOL_SCHEMAS,
     AgentArtsMemoryProvider,
@@ -33,8 +31,6 @@ from provider import (
 # ── Shared helpers ──
 
 ENV_VARS = {
-    "HUAWEICLOUD_SDK_AK": "test-ak",
-    "HUAWEICLOUD_SDK_SK": "test-sk",
     "HUAWEICLOUD_SDK_MEMORY_API_KEY": "test-api-key",
     "HUAWEICLOUD_SDK_REGION": "cn-southwest-2",
     "AGENTARTS_MEMORY_SPACE_ID": "test-space-id",
@@ -74,7 +70,7 @@ def init_provider(provider, mock_sdk):
 class TestConfigSchema:
     def test_schema_is_list_of_dicts(self):
         assert isinstance(CONFIG_SCHEMA, list)
-        assert len(CONFIG_SCHEMA) == 5
+        assert len(CONFIG_SCHEMA) == 3
         for field in CONFIG_SCHEMA:
             assert isinstance(field, dict)
             assert "key" in field
@@ -84,18 +80,6 @@ class TestConfigSchema:
         assert field["secret"] is True
         assert field["required"] is True
         assert field["env_var"] == ENV_API_KEY
-
-    def test_ak_field(self):
-        field = next(f for f in CONFIG_SCHEMA if f["key"] == "ak")
-        assert field["secret"] is True
-        assert field["required"] is True
-        assert field["env_var"] == ENV_AK
-
-    def test_sk_field(self):
-        field = next(f for f in CONFIG_SCHEMA if f["key"] == "sk")
-        assert field["secret"] is True
-        assert field["required"] is True
-        assert field["env_var"] == ENV_SK
 
     def test_space_id_field(self):
         field = next(f for f in CONFIG_SCHEMA if f["key"] == "space_id")
@@ -174,8 +158,6 @@ class TestConstants:
         assert DEFAULT_REGION == "cn-southwest-2"
 
     def test_env_var_names(self):
-        assert ENV_AK == "HUAWEICLOUD_SDK_AK"
-        assert ENV_SK == "HUAWEICLOUD_SDK_SK"
         assert ENV_API_KEY == "HUAWEICLOUD_SDK_MEMORY_API_KEY"
         assert ENV_REGION == "HUAWEICLOUD_SDK_REGION"
         assert ENV_SPACE_ID == "AGENTARTS_MEMORY_SPACE_ID"
@@ -197,24 +179,6 @@ class TestIsAvailable:
     def test_available_true(self, env_vars):
         provider = AgentArtsMemoryProvider()
         assert provider.is_available() is True
-
-    def test_available_false_missing_ak(self, monkeypatch):
-        for key, val in ENV_VARS.items():
-            if key == "HUAWEICLOUD_SDK_AK":
-                continue
-            monkeypatch.setenv(key, val)
-        monkeypatch.delenv("HUAWEICLOUD_SDK_AK", raising=False)
-        provider = AgentArtsMemoryProvider()
-        assert provider.is_available() is False
-
-    def test_available_false_missing_sk(self, monkeypatch):
-        for key, val in ENV_VARS.items():
-            if key == "HUAWEICLOUD_SDK_SK":
-                continue
-            monkeypatch.setenv(key, val)
-        monkeypatch.delenv("HUAWEICLOUD_SDK_SK", raising=False)
-        provider = AgentArtsMemoryProvider()
-        assert provider.is_available() is False
 
     def test_available_false_missing_api_key(self, monkeypatch):
         for key, val in ENV_VARS.items():
@@ -309,9 +273,9 @@ class TestConfigMethods:
         provider = AgentArtsMemoryProvider()
         schema = provider.get_config_schema()
         assert isinstance(schema, list)
-        assert len(schema) == 5
+        assert len(schema) == 3
         keys = {f["key"] for f in schema}
-        assert keys == {"api_key", "ak", "sk", "space_id", "region"}
+        assert keys == {"api_key", "space_id", "region"}
 
     def test_save_config(self, tmp_path):
         provider = AgentArtsMemoryProvider()
@@ -1363,9 +1327,6 @@ class TestRegister:
 
 
 class TestPackageExports:
-    def test_version(self):
-        assert hermes_init.__version__ == "1.0.0"
-
     def test_provider_class_exported(self):
         assert AgentArtsMemoryProvider is not None
 
