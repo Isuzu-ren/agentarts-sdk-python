@@ -42,12 +42,12 @@ def set_current_session(session_id: str):
 
 @tool
 def recall_memory(query: str) -> str:
-    """Deep recall of specific long-term memories via semantic search.
+    """Search long-term memories with a targeted query.
 
-    Relevant memories are already auto-injected each turn via the Store
-    (see [Memory Context] in the system prompt). Only call this tool when
-    you need MORE DETAIL than what was auto-injected, or when searching for
-    a specific past event or preference.
+    The [Memory Context] in the system prompt is a lightweight auto-injected
+    preview (top 3). This tool returns more results (top 5) with a specific
+    query. Call it when the preview doesn't contain what the user is asking
+    about, or when the user references past preferences or prior conversations.
 
     Args:
         query: Natural language description of what to recall,

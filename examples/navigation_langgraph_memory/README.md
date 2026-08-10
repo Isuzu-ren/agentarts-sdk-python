@@ -26,7 +26,7 @@ generate map links, and recall long-term user preferences.
 - **Long-term recall (hybrid)**: 
   - *Auto-injection*: the `auto_recall` node searches `AgentArtsMemoryStore` (LangGraph Store)
     before each LLM call, injecting top-K relevant memories into the system prompt
-    automatically. Zero tool-call latency for common preferences.
+    automatically. No tool call needed for common preferences — saves an LLM round-trip (search itself still incurs network latency).
   - *On-demand tool*: the `recall_memory` tool for deeper or more specific queries
     beyond what was auto-injected.
   - This hybrid pattern (Store auto-injection + on-demand tool) aligns with LangGraph's
@@ -39,6 +39,7 @@ generate map links, and recall long-term user preferences.
 ```bash
 # Install dependencies (langgraph + tui)
 uv sync --extra langgraph --extra tui
+uv pip install langchain-openai   # demo-specific: ChatOpenAI LLM client
 # Or: pip install -r examples/navigation_langgraph_memory/requirements.txt
 
 # Copy the env template and fill in your credentials
@@ -84,10 +85,10 @@ logic can still be exercised.
 # TUI mode (default)
 uv run python examples/navigation_langgraph_memory/nav_agent.py
 
-# Classic CLI mode
+# Classic CLI mode (no SDK logs)
 uv run python examples/navigation_langgraph_memory/nav_agent.py --cli
 
-# Debug mode (show SDK logs)
+# Debug mode (CLI + SDK INFO logs)
 uv run python examples/navigation_langgraph_memory/nav_agent.py --debug
 ```
 
@@ -120,6 +121,8 @@ agent: [calls recall_memory] You mentioned: you prefer highway routes.
 | `config.py` | Env vars, constants, shared config |
 | `setup_memory.py` | One-time: create memory space |
 | `amap_tools.py` | AMap API wrappers (geocode_address, search_poi, plan_route, generate_map_link) |
+| `prompts.py` | Centralized system prompt definitions |
+| `message_utils.py` | Shared message content extraction and history helpers |
 | `memory_tools.py` | recall_memory tool (on-demand deep semantic search) |
 | `session_manager.py` | Multi-session management (create/resume/list) |
 | `nav_agent.py` | LangGraph agent (auto_recall node + LLM + tools) + CLI/TUI |

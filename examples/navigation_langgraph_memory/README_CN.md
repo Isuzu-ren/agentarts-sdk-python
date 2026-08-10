@@ -19,7 +19,7 @@
 
 - **短期记忆**：`AgentArtsMemorySessionSaver` 检查点将对话状态持久化到 AgentArts Memory。后端使用四种内置策略（语义、情景、用户偏好、摘要）自动提取记忆。
 - **长期召回（混合模式）**：
-  - *自动注入*：`auto_recall` 节点在每次 LLM 调用前搜索 `AgentArtsMemoryStore`（LangGraph Store），将最相关的 Top-K 记忆自动注入系统提示词。常见偏好无需工具调用，零延迟。
+  - *自动注入*：`auto_recall` 节点在每次 LLM 调用前搜索 `AgentArtsMemoryStore`（LangGraph Store），将最相关的 Top-K 记忆自动注入系统提示词。常见偏好无需工具调用，省去一次 LLM 调用轮次（搜索本身仍有网络延迟）。
   - *按需工具*：`recall_memory` 工具用于超出自动注入范围的更深层或更具体的查询。
   - 此混合模式（Store 自动注入 + 按需工具）符合 LangGraph 推荐的长期记忆集成最佳实践。
 - **导航**：使用高德地图 Web Service API 进行 POI 搜索和路线规划。未设置 `AMAP_KEY` 时回退到模拟数据。
@@ -29,6 +29,7 @@
 ```bash
 # 安装依赖（langgraph + tui）
 uv sync --extra langgraph --extra tui
+uv pip install langchain-openai   # demo 专用：ChatOpenAI LLM 客户端
 # 或：pip install -r examples/navigation_langgraph_memory/requirements.txt
 
 # 复制环境变量模板并填写凭据
@@ -72,10 +73,10 @@ AMAP_KEY=your-amap-web-service-key
 # TUI 模式（默认）
 uv run python examples/navigation_langgraph_memory/nav_agent.py
 
-# 经典 CLI 模式
+# 经典 CLI 模式（无 SDK 日志）
 uv run python examples/navigation_langgraph_memory/nav_agent.py --cli
 
-# 调试模式（显示 SDK 日志）
+# 调试模式（CLI + SDK 日志）
 uv run python examples/navigation_langgraph_memory/nav_agent.py --debug
 ```
 
@@ -108,6 +109,8 @@ agent: [调用 recall_memory] 您提到过：您偏好高速路线。
 | `config.py` | 环境变量、常量、共享配置 |
 | `setup_memory.py` | 一次性：创建记忆空间 |
 | `amap_tools.py` | 高德地图 API 封装（geocode_address、search_poi、plan_route、generate_map_link） |
+| `prompts.py` | 系统提示词集中管理 |
+| `message_utils.py` | 消息内容提取和历史查询共享逻辑 |
 | `memory_tools.py` | recall_memory 工具（按需深度语义搜索） |
 | `session_manager.py` | 多会话管理（创建/恢复/列表） |
 | `nav_agent.py` | LangGraph agent（auto_recall 节点 + LLM + 工具）+ CLI/TUI |

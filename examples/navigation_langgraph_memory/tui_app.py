@@ -355,33 +355,18 @@ class NavAgentApp(App):
 
     def _show_message_history(self, chat_log: RichLog, session_id: str) -> None:
         """Fetch and display recent messages from the session."""
-        client = None
+        from message_utils import fetch_session_history
+
         try:
-            from agentarts.sdk import MemoryClient
+            history = fetch_session_history(session_id)
 
-            client = MemoryClient(api_key=config.API_KEY, verify_ssl=config.VERIFY_SSL)
-            messages = client.get_last_k_messages(
-                space_id=config.SPACE_ID,
-                session_id=session_id,
-                k=20
-            )
-
-            if not messages:
+            if not history:
                 chat_log.write("[dim]No message history found.[/]")
                 return
 
-            # Filter and display messages (oldest first, newest last)
+            # Display messages (oldest first, newest last)
             chat_log.write("[dim]--- Recent Messages ---[/]")
-            for msg in messages:
-                # Extract role
-                if isinstance(msg, dict):
-                    role = msg.get('role', '')
-                    content = self._extract_content(msg)
-                else:
-                    role = getattr(msg, 'role', '')
-                    content = self._extract_content(msg)
-
-                # Only show user and agent messages, skip tool calls
+            for role, content in history:
                 if role == 'user':
                     chat_log.write(f"[cyan]you:[/] {content}")
                 elif role == 'assistant':
@@ -396,42 +381,6 @@ class NavAgentApp(App):
                 import traceback
                 chat_log.write(f"[dim]{traceback.format_exc()}[/]")
             chat_log.write("")
-        finally:
-            if client:
-                try:
-                    client.close()
-                except Exception:
-                    pass
-
-    def _extract_content(self, msg) -> str:
-        """Extract text content from message (handles both dict and MessageInfo)."""
-        # MessageInfo has 'parts' field: [{'type': 'text', 'text': '...'}]
-        if isinstance(msg, dict):
-            parts = msg.get('parts', [])
-        else:
-            parts = getattr(msg, 'parts', [])
-
-        if parts:
-            # Extract text from parts (handle both dict and object)
-            texts = []
-            for p in parts:
-                # Check if part is a dict or object
-                if isinstance(p, dict):
-                    part_type = p.get('type')
-                    part_text = p.get('text', '')
-                else:
-                    part_type = getattr(p, 'type', None)
-                    part_text = getattr(p, 'text', '')
-
-                if part_type == 'text':
-                    texts.append(part_text)
-            return ' '.join(texts)
-
-        # Fallback: try content field
-        if isinstance(msg, dict):
-            return msg.get('content', '')
-        else:
-            return getattr(msg, 'content', '') or str(msg)
 
     def _build_agent(self) -> None:
         """Build the LangGraph agent."""

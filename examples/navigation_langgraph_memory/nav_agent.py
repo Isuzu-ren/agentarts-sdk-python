@@ -18,6 +18,7 @@ queries beyond the auto-injected context.
 Prerequisites:
   1. Install dependencies:
        uv sync --extra langgraph --extra tui
+       uv pip install langchain-openai
      Or: pip install -r examples/navigation_langgraph_memory/requirements.txt
   2. Copy env template and fill in credentials:
        cp examples/navigation_langgraph_memory/.env.example examples/navigation_langgraph_memory/.env
@@ -28,8 +29,8 @@ Prerequisites:
 
 Usage:
   uv run python examples/navigation_langgraph_memory/nav_agent.py          # TUI mode (default)
-  uv run python examples/navigation_langgraph_memory/nav_agent.py --cli    # Classic CLI mode
-  uv run python examples/navigation_langgraph_memory/nav_agent.py --debug  # Show SDK logs
+  uv run python examples/navigation_langgraph_memory/nav_agent.py --cli    # Classic CLI mode (no SDK logs)
+  uv run python examples/navigation_langgraph_memory/nav_agent.py --debug  # CLI mode + SDK INFO logs
 """
 
 import os
@@ -84,6 +85,7 @@ def build_agent():
 
     from amap_tools import generate_map_link, geocode_address, plan_route, search_poi
     from memory_tools import recall_memory
+    from prompts import SYSTEM_PROMPT
 
     class NavAgentState(MessagesState):
         """State with memory_context for auto-injected long-term memories.
@@ -94,34 +96,6 @@ def build_agent():
         """
 
         memory_context: str
-
-    SYSTEM_PROMPT = """\
-You are a navigation assistant that helps users find places and plan routes.
-
-Available tools:
-- geocode_address: Convert a place name (e.g. "中关村") to coordinates.
-  Call this FIRST when the user gives a place name and you need coordinates
-  for plan_route or nearby search_poi.
-- search_poi: Search for POIs (gas stations, restaurants, parking, etc.).
-  Supports nearby search when location coordinates are provided.
-- plan_route: Plan a route (driving/walking/riding/transit). Supports
-  waypoints for driving and requires city for transit.
-- generate_map_link: Generate a map visualization URL for locations
-- recall_memory: Deep recall tool for specific historical queries.
-  Relevant memories are auto-injected each turn (see [Memory Context]).
-  Only call this tool when you need details BEYOND the auto-injected context.
-
-Rules:
-- Coordinates use "longitude,latitude" format, e.g. "116.481181,39.990021"
-- When the user gives a place name (e.g. "中关村"), call geocode_address
-  to get coordinates before planning routes or doing nearby search
-- If the user's location is unknown, ask which city or area they are in
-- When the user expresses a preference (e.g. "I like highways"), respond
-  naturally - the memory system saves it automatically
-- Use recall_memory only for deep queries beyond the auto-injected
-  [Memory Context]; do NOT call it every turn
-- Present POI options clearly with names and addresses before planning routes
-"""
 
     all_tools = [geocode_address, search_poi, plan_route, generate_map_link, recall_memory]
 
@@ -227,32 +201,77 @@ Rules:
 
 
 def main():
-    """Entry point - dispatches to TUI or CLI mode."""
+    """Entry point - dispatches to TUI or CLI mode.
+
+    --debug implies CLI mode: SDK INFO logs scroll naturally in the
+    terminal instead of being wiped by TUI redraws.
+    """
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Navigation Agent Demo (LangGraph + AgentArts Memory)")
     parser.add_argument(
         "--debug", action="store_true",
-        help="Show SDK INFO logs and debug prints (default: clean mode)")
+        help="CLI mode with SDK INFO logs visible (logs scroll in terminal)")
     parser.add_argument(
         "--cli", action="store_true",
-        help="Use classic CLI interface (default: TUI)")
+        help="Use classic CLI interface without SDK logs (default: TUI)")
     args = parser.parse_args()
 
     import cli_flags
     cli_flags.DEBUG = args.debug
 
-    # Suppress SDK INFO logs in clean mode (must be set before any SDK import)
     if not cli_flags.DEBUG:
         os.environ["AGENTARTS_LOG_LEVEL"] = "WARNING"
 
     _check_env()
 
-    if args.cli:
+    # --debug implies CLI: SDK logs scroll naturally instead of being
+    # wiped by TUI redraws
+    if args.debug or args.cli:
         main_cli()
     else:
         main_tui()
+
+
+def _print_debug_trace(event: dict):
+    """Print a debug trace of a LangGraph stream event.
+
+    Called per event from agent.stream(stream_mode="updates") in --debug
+    mode. Each event is {node_name: node_output}. Returns the final AI
+    reply text if this event contains the terminal agent response.
+    """
+    from langchain_core.messages import AIMessage, ToolMessage
+
+    final_reply = None
+    for node_name, update in event.items():
+        if node_name == "auto_recall":
+            ctx = update.get("memory_context", "")
+            if ctx:
+                print("  [trace auto_recall] memories injected:")
+                for line in ctx.split("\n"):
+                    print(f"    {line}")
+            else:
+                print("  [trace auto_recall] no memories injected")
+        elif node_name == "agent":
+            for msg in update.get("messages", []):
+                if isinstance(msg, AIMessage):
+                    tool_calls = getattr(msg, "tool_calls", None)
+                    if tool_calls:
+                        for tc in tool_calls:
+                            name = tc.get("name", "?")
+                            args = tc.get("args", {})
+                            print(f"  [trace agent] -> tool call: {name}({args})")
+                    elif msg.content:
+                        final_reply = msg.content
+        elif node_name == "tools":
+            for msg in update.get("messages", []):
+                if isinstance(msg, ToolMessage):
+                    name = getattr(msg, "name", "?")
+                    content = getattr(msg, "content", "")
+                    preview = content[:500] + ("..." if len(content) > 500 else "")
+                    print(f"  [trace tools] {name} -> {preview}")
+    return final_reply
 
 
 def main_cli():
@@ -270,7 +289,8 @@ def main_cli():
     session_id, session_title = session_manager.select_session_interactive()
 
     # Validate session exists in current space
-    if not session_manager.validate_session(session_id):
+    is_resume = session_manager.validate_session(session_id)
+    if not is_resume:
         print(f"\n[WARN] Session {session_id[:8]}... not found in current space.")
         print("       This session may belong to a different space.")
         print("       Creating a new session...")
@@ -289,9 +309,27 @@ def main_cli():
     print("Type 'quit' / 'exit' to stop.")
     print()
 
+    # Show recent message history for resumed sessions (matches TUI behavior)
+    if is_resume:
+        from message_utils import fetch_session_history
+
+        try:
+            history = fetch_session_history(session_id)
+            if history:
+                print("  --- Recent Messages ---")
+                for role, content in history:
+                    print(f"  {role}: {content}")
+                print("  --- End History ---")
+            else:
+                print("  (No message history found.)")
+        except Exception as e:
+            print(f"  (Could not load message history: {e})")
+        print()
+
     agent, checkpointer, store = build_agent()
 
     from langchain_core.messages import HumanMessage
+    import cli_flags
 
     thread_config = {
         "configurable": {
@@ -302,6 +340,14 @@ def main_cli():
     }
 
     message_count = 0
+    # For resumed sessions, load existing count from sessions.json so we
+    # accumulate onto the historical total instead of overwriting it with
+    # this run's count (matches TUI behavior in tui_app.py).
+    if is_resume:
+        for s in session_manager.list_sessions():
+            if s["session_id"] == session_id:
+                message_count = s.get("message_count", 0)
+                break
     title_auto_set = bool(session_title and not session_title.startswith("Session "))
 
     try:
@@ -324,14 +370,27 @@ def main_cli():
                 session_title = auto_title
                 title_auto_set = True
 
-            result = agent.invoke(
-                {"messages": [HumanMessage(content=user_input)]},
-                config=thread_config,
-            )
+            if cli_flags.DEBUG:
+                # Stream mode: trace each node's output in real time
+                reply_text = None
+                for event in agent.stream(
+                    {"messages": [HumanMessage(content=user_input)]},
+                    config=thread_config,
+                    stream_mode="updates",
+                ):
+                    reply = _print_debug_trace(event)
+                    if reply:
+                        reply_text = reply
+                reply_text = reply_text or "(no response)"
+            else:
+                result = agent.invoke(
+                    {"messages": [HumanMessage(content=user_input)]},
+                    config=thread_config,
+                )
+                reply = result["messages"][-1]
+                reply_text = reply.content if hasattr(reply, "content") else str(reply)
 
             message_count += 1
-            reply = result["messages"][-1]
-            reply_text = reply.content if hasattr(reply, "content") else str(reply)
             print(f"agent: {reply_text}\n")
     finally:
         # Update session metadata on exit
