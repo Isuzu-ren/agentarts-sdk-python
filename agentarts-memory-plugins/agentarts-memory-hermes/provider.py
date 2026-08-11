@@ -44,7 +44,7 @@ _NON_SECRET_KEYS = frozenset({"space_id", "region"})
 CONFIG_SCHEMA: list[dict[str, Any]] = [
     {
         "key": "api_key",
-        "description": "Huawei Cloud AgentArts Memory API Key (data plane authentication)",
+        "description": "Huawei Cloud AgentArts Memory API Key",
         "secret": True,
         "required": True,
         "env_var": ENV_API_KEY,
@@ -57,7 +57,7 @@ CONFIG_SCHEMA: list[dict[str, Any]] = [
     },
     {
         "key": "region",
-        "description": "Huawei Cloud region",
+        "description": "Huawei Cloud Region",
         "default": DEFAULT_REGION,
         "env_var": ENV_REGION,
     },
