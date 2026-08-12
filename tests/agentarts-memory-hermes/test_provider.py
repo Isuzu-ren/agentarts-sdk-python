@@ -226,7 +226,7 @@ class TestInitialize:
         assert provider._client is mock_client
         assert provider._space_id == "test-space-id"
         assert provider._session_id == "agentarts-session-123"
-        assert provider._actor_id == "hermes-session-1"
+        assert provider._actor_id == "hermes-user"
         assert provider._hermes_home == "/tmp/hermes"
         assert provider._assistant_id == "hermes-agent"
 

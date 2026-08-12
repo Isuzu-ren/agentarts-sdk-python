@@ -171,7 +171,7 @@ class AgentArtsMemoryProvider:
         """
         self._hermes_home = kwargs.get("hermes_home", "")
         self._session_id = session_id
-        self._actor_id = session_id
+        self._actor_id = kwargs.get("user_id", "hermes-user")
         self._space_id = os.getenv(ENV_SPACE_ID, "")
         region = os.getenv(ENV_REGION, DEFAULT_REGION)
         api_key = os.getenv(ENV_API_KEY, "")
