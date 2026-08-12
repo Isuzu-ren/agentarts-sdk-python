@@ -126,7 +126,7 @@ class AsyncMemoryClient:
 
     def get_space(self, space_id: str) -> SpaceInfo:
         """Get Space details - identical to sync version."""
-        self._ensure_control_plane_initialized(self._async_data_plane.client.region_name)
+        self._ensure_control_plane_initialized(self.region_name)
         return self._control_plane.get_space(space_id)
 
     def list_spaces(
@@ -135,7 +135,7 @@ class AsyncMemoryClient:
             offset: int = 0
     ) -> SpaceListResponse:
         """List all Spaces - identical to sync version."""
-        self._ensure_control_plane_initialized(self._async_data_plane.client.region_name)
+        self._ensure_control_plane_initialized(self.region_name)
         return self._control_plane.list_spaces(limit, offset)
 
     def update_space(
@@ -164,12 +164,12 @@ class AsyncMemoryClient:
             memory_strategies_builtin=memory_strategies_builtin
         )
 
-        self._ensure_control_plane_initialized(self._async_data_plane.client.region_name)
+        self._ensure_control_plane_initialized(self.region_name)
         return self._control_plane.update_space(space_id, request)
 
     def delete_space(self, space_id: str) -> None:
         """Delete Space - identical to sync version."""
-        self._ensure_control_plane_initialized(self._async_data_plane.client.region_name)
+        self._ensure_control_plane_initialized(self.region_name)
         return self._control_plane.delete_space(space_id)
 
     # ==================== Data Plane - Session Management (Async) ====================
@@ -191,6 +191,10 @@ class AsyncMemoryClient:
         )
 
         return await self._async_data_plane.create_memory_session(space_id, session_request)
+
+    async def delete_session(self, space_id: str, session_id: str) -> None:
+        """Delete a session (soft delete) - identical to sync version."""
+        await self._async_data_plane.delete_session(space_id, session_id)
 
     # ==================== Data Plane - Message Management (Async) ====================
 
