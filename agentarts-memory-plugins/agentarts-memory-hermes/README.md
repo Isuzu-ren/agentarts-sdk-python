@@ -26,30 +26,16 @@ Hermes Memory Provider 插件，将华为云 AgentArts Memory 作为 Hermes Agen
 
 ## 安装
 
-有两种安装方式，任选其一。
-
-### 方式一：作为 memory provider 安装
-
-将插件目录复制到 Hermes 的 memory provider 插件路径：
+将插件目录agentarts-memory-hermes复制到 Hermes 的 memory provider 插件路径并重命名为agentarts-memory：
 
 ```bash
-cp -r agentarts-memory-hermes  ~/.hermes/hermes-agent/plugins/memory/
-```
-通过 `hermes memory setup` 交互式配置，或手动设置上述环境变量。 按提示选择 `agentarts_memory` 并完成配置。
-
-### 方式二：作为通用插件安装
-
-将插件目录复制到 Hermes 的通用插件路径，通过 `hermes plugins` 命令注册：
-
-```bash
-cp -r agentarts-memory-hermes ~/.hermes/plugins/
+cp -r agentarts-memory-hermes  ~/.hermes/hermes-agent/plugins/memory/agentarts-memory
 ```
 
-通过 `hermes plugins` 交互式配置，或手动设置上述环境变量。 按提示选择 `agentarts_memory` 并完成配置。
 
 ## 配置
 
-配置过程中会提示输入 API Key、Space ID 等。敏感字段（API Key）写入 `.env`，非敏感配置（`space_id`、`region`）写入 `$HERMES_HOME/agentarts.json`。
+通过命令 `hermes memory setup` 进行交互式配置，按提示选择 `agentarts-memory` 后，输入正确的参数完成配置。
 
 ## 工具说明
 
@@ -74,11 +60,12 @@ cp -r agentarts-memory-hermes ~/.hermes/plugins/
 
 插件注册后提供以下 CLI 子命令（仅在 provider 活跃时可用）：
 
-| 命令 | 说明 |
-|---|---|
-| `hermes agentarts_memory status` | 显示 provider 状态和环境变量配置 |
-| `hermes agentarts_memory config` | 显示已保存的非敏感配置 |
-| `hermes agentarts_memory test` | 测试 provider 连通性 |
+| 命令                    | 说明               |
+|-------------------------|------------------|
+| `hermes memory status`  | 查看 provider 状态  |
+| `hermes memory setup`   | 配置 provider      |
+| `hermes memory off`     | 禁用 provider      |
+
 
 ## 架构说明
 
@@ -116,5 +103,5 @@ AgentArts Memory 从对话消息生成记忆需要时间（约 30 秒）。`sync
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/unit/ -v
+pytest tests/agentarts-memory-hermes/ -v
 ```

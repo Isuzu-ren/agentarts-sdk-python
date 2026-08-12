@@ -20,36 +20,20 @@ A Hermes Memory Provider plugin that uses Huawei Cloud AgentArts Memory as the l
 | Parameter                       | Description                        |
 |---------------------------------|------------------------------------|
 | `AGENTARTS_MEMORY_SPACE_ID`     | AgentArts memory space ID          |
-| `HUAWEICLOUD_SDK_MEMORY_API_KEY`| AgentArts memory space API Key     |
+| `HUAWEICLOUD_SDK_MEMORY_API_KEY`| AgentArts memory space API Key      |
 | `HUAWEICLOUD_SDK_REGION`        | Region (default `cn-southwest-2`)  |
 
 ## Installation
 
-There are two installation methods — choose either one.
-
-### Option 1: Install as a memory provider
-
-Copy the plugin directory to Hermes' memory provider plugin path:
+Copy the plugin directory `agentarts-memory-hermes` to Hermes' memory provider plugin path and rename it to `agentarts-memory`:
 
 ```bash
-cp -r agentarts-memory-hermes  ~/.hermes/hermes-agent/plugins/memory/
+cp -r agentarts-memory-hermes  ~/.hermes/hermes-agent/plugins/memory/agentarts-memory
 ```
-
-Configure interactively via `hermes memory setup`, or manually set the environment variables above. Follow the prompts to select `agentarts_memory` and complete configuration.
-
-### Option 2: Install as a general plugin
-
-Copy the plugin directory to Hermes' general plugin path and register via the `hermes plugins` command:
-
-```bash
-cp -r agentarts-memory-hermes ~/.hermes/plugins/
-```
-
-Configure interactively via `hermes plugins`, or manually set the environment variables above. Follow the prompts to select `agentarts_memory` and complete configuration.
 
 ## Configuration
 
-During configuration, you will be prompted to enter the API Key, Space ID, etc. Sensitive fields (API Key) are written to `.env`, while non-sensitive config (`space_id`, `region`) is written to `$HERMES_HOME/agentarts.json`.
+Configure interactively via the `hermes memory setup` command. Follow the prompts to select `agentarts-memory`, then enter the correct parameters to complete configuration.
 
 ## Tools
 
@@ -74,11 +58,11 @@ Get a list of AgentArts memory summaries.
 
 After the plugin is registered, the following CLI subcommands are available (only when the provider is active):
 
-| Command | Description |
-|---|---|
-| `hermes agentarts_memory status` | Show provider status and environment variable configuration |
-| `hermes agentarts_memory config` | Show saved non-sensitive configuration |
-| `hermes agentarts_memory test` | Test provider connectivity |
+| Command                | Description                |
+|------------------------|----------------------------|
+| `hermes memory status` | Show provider status       |
+| `hermes memory setup`  | Configure the provider     |
+| `hermes memory off`    | Disable the provider       |
 
 ## Architecture
 
@@ -116,5 +100,5 @@ Check:
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/unit/ -v
+pytest tests/agentarts-memory-hermes/ -v
 ```
