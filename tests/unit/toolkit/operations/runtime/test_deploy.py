@@ -10,6 +10,7 @@ from agentarts.toolkit.operations.runtime.deploy import (
 from agentarts.toolkit.utils.runtime.config import (
     AgentArtsConfig,
     AgentArtsRuntimeConfig,
+    SessionStorageConfig,
     SfsTurboConfig,
     StorageConfig,
 )
@@ -223,7 +224,7 @@ class TestCreateAgentartsRuntime:
 
     @patch("agentarts.toolkit.operations.runtime.deploy.RuntimeClient")
     def test_storage_config_session_storage_only_forwarded(self, mock_client, tmp_path, monkeypatch):
-        """session_storage_mount_path alone is forwarded without sfs_turbo."""
+        """session_storage alone is forwarded without sfs_turbo."""
         monkeypatch.chdir(tmp_path)
 
         mock_client_instance = MagicMock()
@@ -236,7 +237,7 @@ class TestCreateAgentartsRuntime:
         agent_config = AgentArtsConfig(
             runtime=AgentArtsRuntimeConfig(
                 storage_config=StorageConfig(
-                    session_storage_mount_path="/home/user/sessions",
+                    session_storage=SessionStorageConfig(mount_path="/home/user/sessions"),
                 ),
             ),
         )
@@ -250,12 +251,12 @@ class TestCreateAgentartsRuntime:
 
         call_args = mock_client_instance.create_or_update_agent.call_args
         assert call_args.kwargs["storage_config"] == {
-            "session_storage_mount_path": "/home/user/sessions",
+            "session_storage": {"mount_path": "/home/user/sessions"},
         }
 
     @patch("agentarts.toolkit.operations.runtime.deploy.RuntimeClient")
     def test_storage_config_both_fields_forwarded(self, mock_client, tmp_path, monkeypatch):
-        """Both sfs_turbo and session_storage_mount_path are forwarded together."""
+        """Both sfs_turbo and session_storage are forwarded together."""
         monkeypatch.chdir(tmp_path)
 
         mock_client_instance = MagicMock()
@@ -272,7 +273,7 @@ class TestCreateAgentartsRuntime:
                         sfs_turbo_id="12345678-1234-1234-1234-123456789012",
                         mount_path="/data",
                     ),
-                    session_storage_mount_path="/home/user/sessions",
+                    session_storage=SessionStorageConfig(mount_path="/home/user/sessions"),
                 ),
             ),
         )
@@ -290,7 +291,7 @@ class TestCreateAgentartsRuntime:
                 "sfs_turbo_id": "12345678-1234-1234-1234-123456789012",
                 "mount_path": "/data",
             }],
-            "session_storage_mount_path": "/home/user/sessions",
+            "session_storage": {"mount_path": "/home/user/sessions"},
         }
 
     @patch("agentarts.toolkit.operations.runtime.deploy.RuntimeClient")

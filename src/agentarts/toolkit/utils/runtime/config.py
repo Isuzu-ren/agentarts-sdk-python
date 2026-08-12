@@ -225,6 +225,24 @@ class SfsTurboConfig(BaseModel):
         return {k: v for k, v in data.items() if v not in ([], {})}
 
 
+class SessionStorageConfig(BaseModel):
+    """Session storage configuration."""
+
+    mount_path: str | None = Field(
+        default=None,
+        description="Session storage mount path in the container",
+    )
+
+    model_config = {
+        "extra": "allow",
+    }
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert configuration to dictionary."""
+        data = self.model_dump(mode="json", exclude_none=True)
+        return {k: v for k, v in data.items() if v not in ([], {})}
+
+
 class StorageConfig(BaseModel):
     """Storage configuration for the runtime."""
 
@@ -232,9 +250,9 @@ class StorageConfig(BaseModel):
         default_factory=SfsTurboConfig,
         description="SFS Turbo storage configuration",
     )
-    session_storage_mount_path: str | None = Field(
-        default=None,
-        description="Session storage mount path in the container",
+    session_storage: SessionStorageConfig | None = Field(
+        default_factory=SessionStorageConfig,
+        description="Session storage configuration",
     )
 
     model_config = {
@@ -254,8 +272,10 @@ class StorageConfig(BaseModel):
             item = st.to_dict()
             if item:
                 result["sfs_turbo"] = [item]
-        if self.session_storage_mount_path is not None:
-            result["session_storage_mount_path"] = self.session_storage_mount_path
+        if self.session_storage is not None:
+            ss = self.session_storage.to_dict()
+            if ss:
+                result["session_storage"] = ss
         return result
 
 

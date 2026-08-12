@@ -28,6 +28,7 @@ from agentarts.toolkit.utils.runtime.config import (
     CustomJWTAuthConfig,
     InboundIdentityConfig,
     SfsTurboConfig,
+    SessionStorageConfig,
     StorageConfig,
 )
 
@@ -589,21 +590,21 @@ class TestStorageConfig:
         assert StorageConfig().to_dict() == {}
 
     def test_storage_config_to_dict_session_storage_only(self):
-        """StorageConfig with only session_storage_mount_path serializes correctly."""
+        """StorageConfig with only session_storage serializes correctly."""
         cfg = StorageConfig(
-            session_storage_mount_path="/home/user/sessions",
+            session_storage=SessionStorageConfig(mount_path="/home/user/sessions"),
         )
         result = cfg.to_dict()
-        assert result == {"session_storage_mount_path": "/home/user/sessions"}
+        assert result == {"session_storage": {"mount_path": "/home/user/sessions"}}
 
     def test_storage_config_to_dict_both_fields(self):
-        """StorageConfig with both sfs_turbo and session_storage_mount_path."""
+        """StorageConfig with both sfs_turbo and session_storage."""
         cfg = StorageConfig(
             sfs_turbo=SfsTurboConfig(
                 sfs_turbo_id="12345678-1234-1234-1234-123456789012",
                 mount_path="/data",
             ),
-            session_storage_mount_path="/home/user/sessions",
+            session_storage=SessionStorageConfig(mount_path="/home/user/sessions"),
         )
         result = cfg.to_dict()
         assert result == {
@@ -611,7 +612,7 @@ class TestStorageConfig:
                 "sfs_turbo_id": "12345678-1234-1234-1234-123456789012",
                 "mount_path": "/data",
             }],
-            "session_storage_mount_path": "/home/user/sessions",
+            "session_storage": {"mount_path": "/home/user/sessions"},
         }
 
     def test_invalid_sfs_turbo_id_rejected(self):
