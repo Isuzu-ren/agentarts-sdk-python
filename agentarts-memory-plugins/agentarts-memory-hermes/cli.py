@@ -9,10 +9,8 @@ import json
 import os
 
 from provider import (
-    ENV_AK,
     ENV_API_KEY,
     ENV_REGION,
-    ENV_SK,
     ENV_SPACE_ID,
     AgentArtsMemoryProvider,
 )
@@ -30,8 +28,6 @@ def _status(args) -> None:
     print("Environment variables:")
 
     env_info = [
-        ("HUAWEICLOUD_SDK_AK", ENV_AK, False),
-        ("HUAWEICLOUD_SDK_SK", ENV_SK, False),
         ("HUAWEICLOUD_SDK_MEMORY_API_KEY", ENV_API_KEY, False),
         ("AGENTARTS_MEMORY_SPACE_ID", ENV_SPACE_ID, False),
         ("HUAWEICLOUD_SDK_REGION", ENV_REGION, True),
