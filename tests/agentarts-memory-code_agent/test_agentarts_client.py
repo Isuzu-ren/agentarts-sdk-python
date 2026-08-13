@@ -67,8 +67,7 @@ def test_health_reports_flags(monkeypatch):
     c = _make_client(monkeypatch)
     h = c.health()
     assert h["space_id"] is True
-    assert h["ak"] is True
-    assert h["sk"] is True
+    assert h["api_key"] is True
     assert h["status"] == "healthy"
 
 
