@@ -1,6 +1,6 @@
 {
   "name": "agentarts-memory-capture",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "OpenCode plugin for AgentArts Memory — session lifecycle capture, assistant reply tracking, system prompt injection.",
   "author": {
     "name": "AgentArts"

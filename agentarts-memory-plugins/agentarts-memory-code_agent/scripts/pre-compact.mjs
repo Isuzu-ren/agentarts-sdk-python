@@ -4,9 +4,9 @@ import {
   resolveProject,
   searchAndFormat,
   isSdkChildContext,
+  resolveUserId,
   coerceText,
   formatOutput,
-  DEFAULT_USER_ID,
 } from "./_shared.mjs";
 
 async function main() {
@@ -18,6 +18,7 @@ async function main() {
 
   const cwd = data.cwd || process.cwd();
   const scopeId = resolveProject(cwd);
+  const userId = resolveUserId(data);
 
   // Extract query from conversation (last user message).
   const messages = data.messages || [];
@@ -27,7 +28,7 @@ async function main() {
   }
   if (!query) query = scopeId;
 
-  const context = await searchAndFormat(query, scopeId, DEFAULT_USER_ID);
+  const context = await searchAndFormat(query, scopeId, userId);
   if (context) process.stdout.write(formatOutput(context, "preCompact"));
 }
 

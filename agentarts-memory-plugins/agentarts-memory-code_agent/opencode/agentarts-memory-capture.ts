@@ -14,12 +14,48 @@ import type { Plugin } from "@opencode-ai/plugin";
 const REST_URL =
   process.env.AGENTARTS_MEMORY_SERVER_URL || "http://127.0.0.1:8719";
 const DEBUG = process.env.AGENTARTS_MEMORY_DEBUG === "1";
-const DEFAULT_USER_ID =
-  process.env.AGENTARTS_MEMORY_USER_ID || "opencode-user";
+
+// Platform detection for OpenCode — default to opencode since this plugin only runs in OpenCode
+function detectOpenCodePlatform(): string {
+  if (process.env.OPENCODE_PLUGIN_ROOT) return "opencode";
+  // Default to opencode for this plugin since it's OpenCode-specific
+  return "opencode";
+}
+
+const PLATFORM_USER_ID: Record<string, string> = {
+  "opencode": "opencode-user",
+  "unknown": "__default__",
+};
+
+// Lazy-resolved default user_id, computed at runtime when first needed
+let _cachedDefaultUserId: string | null = null;
+function getDefaultUserId(): string {
+  if (_cachedDefaultUserId === null) {
+    _cachedDefaultUserId = process.env.AGENTARTS_MEMORY_USER_ID || PLATFORM_USER_ID[detectOpenCodePlatform()];
+  }
+  return _cachedDefaultUserId;
+}
 
 const SEARCH_MEM_NUM = 5;
 const SEARCH_SUMMARY_NUM = 3;
 const DEFAULT_THRESHOLD = 0.3;
+
+/**
+ * Resolve user_id with priority:
+ *   1. payload.user_id / payload.userId (from hook request)
+ *   2. AGENTARTS_MEMORY_USER_ID env var
+ *   3. OPENCODE_PLUGIN_ROOT detected -> "opencode-user"
+ *   4. Default: "__default__"
+ */
+function resolveUserId(payload: unknown): string {
+  if (payload && typeof payload === "object") {
+    const explicit = (payload as any).user_id || (payload as any).userId;
+    if (explicit && typeof explicit === "string" && explicit.trim()) {
+      return explicit.trim();
+    }
+  }
+  return getDefaultUserId();
+}
 
 function authHeaders(): Record<string, string> {
   return { "Content-Type": "application/json" };
@@ -75,7 +111,7 @@ async function postJson(
 async function addMessages(
   messages: Array<{ role: string; content: string }>,
   scopeId: string,
-  userId = DEFAULT_USER_ID,
+  userId = getDefaultUserId(),
 ): Promise<void> {
   await post("add_messages/", { messages, user_id: userId, scope_id: scopeId });
 }
@@ -83,7 +119,7 @@ async function addMessages(
 async function searchAndFormat(
   query: string,
   scopeId: string,
-  userId = DEFAULT_USER_ID,
+  userId = getDefaultUserId(),
 ): Promise<string> {
   const [memResult, summaryResult] = await Promise.all([
     postJson("search_memory/", {
@@ -144,6 +180,7 @@ Never fabricate memory results — only present what the tools return.
 // Session state
 // ---------------------------------------------------------------------------
 let activeSessionId: string | null = null;
+let sessionUserId: string | null = null;  // Per-session user_id from hooks
 const DEFAULT_SCOPE_ID = process.env.AGENTARTS_MEMORY_PROJECT_NAME || "opencode-default";
 let projectScopeId: string = DEFAULT_SCOPE_ID;
 const contextInjectedSessions = new Set<string>();
@@ -162,6 +199,9 @@ export const AgentArtsMemoryCapturePlugin: Plugin = async (ctx) => {
     if (derived) projectScopeId = derived;
   }
 
+  // Resolve user_id from context (hooks request) with fallback
+  const getUserId = () => sessionUserId || resolveUserId(ctx);
+
   return {
     event: async ({ event }) => {
       const type = event.type;
@@ -172,6 +212,10 @@ export const AgentArtsMemoryCapturePlugin: Plugin = async (ctx) => {
         const info = props.info as Record<string, unknown> | undefined;
         activeSessionId = (info?.id as string) || props.sessionID || null;
         if (!activeSessionId) return;
+
+        // Resolve user_id from session creation props
+        sessionUserId = resolveUserId(props);
+
         contextInjectedSessions.delete(activeSessionId);
         sessionLastUserQuery.delete(activeSessionId);
         sessionPendingAdd.delete(activeSessionId);
@@ -190,7 +234,10 @@ export const AgentArtsMemoryCapturePlugin: Plugin = async (ctx) => {
       if (type === "session.deleted") {
         const sid = (props.info as any)?.id || props.sessionID || activeSessionId;
         if (sid) {
-          if (sid === activeSessionId) activeSessionId = null;
+          if (sid === activeSessionId) {
+            activeSessionId = null;
+            sessionUserId = null;
+          }
           contextInjectedSessions.delete(sid);
           sessionLastUserQuery.delete(sid);
           sessionPendingAdd.delete(sid);
@@ -209,7 +256,7 @@ export const AgentArtsMemoryCapturePlugin: Plugin = async (ctx) => {
           const pendingQuery = sessionPendingAdd.get(sid);
           if (!pendingQuery) return;
           sessionPendingAdd.delete(sid);
-          await addMessages([{ role: "user", content: pendingQuery }], projectScopeId);
+          await addMessages([{ role: "user", content: pendingQuery }], projectScopeId, getUserId());
         }
       }
     },
@@ -233,7 +280,7 @@ export const AgentArtsMemoryCapturePlugin: Plugin = async (ctx) => {
       sessionPendingAdd.set(sid, userText.slice(0, 8000));
 
       // Search once per user message, cache the result.
-      const searchResult = await searchAndFormat(query, projectScopeId, DEFAULT_USER_ID);
+      const searchResult = await searchAndFormat(query, projectScopeId, getUserId());
       if (searchResult) sessionSearchResult.set(sid, searchResult);
       else sessionSearchResult.delete(sid);
     },
@@ -266,7 +313,7 @@ export const AgentArtsMemoryCapturePlugin: Plugin = async (ctx) => {
       const context =
         cachedResult ||
         (sessionLastUserQuery.has(sid)
-          ? await searchAndFormat(sessionLastUserQuery.get(sid)!, projectScopeId, DEFAULT_USER_ID)
+          ? await searchAndFormat(sessionLastUserQuery.get(sid)!, projectScopeId, getUserId())
           : "");
       if (context && Array.isArray(output.context)) {
         output.context.push(context);

@@ -5,9 +5,9 @@ import {
   addMessages,
   searchAndFormat,
   isSdkChildContext,
+  resolveUserId,
   coerceText,
   formatOutput,
-  DEFAULT_USER_ID,
 } from "./_shared.mjs";
 
 async function main() {
@@ -19,14 +19,15 @@ async function main() {
 
   const cwd = data.cwd || process.cwd();
   const scopeId = resolveProject(cwd);
+  const userId = resolveUserId(data);
   const prompt = coerceText(data.prompt ?? data.userPrompt ?? "");
   if (!prompt) return;
 
   // Fire-and-forget background write — never block the agent loop.
-  addMessages([{ role: "user", content: prompt }], scopeId, DEFAULT_USER_ID).catch(() => {});
+  addMessages([{ role: "user", content: prompt }], scopeId, userId).catch(() => {});
 
   // Search for relevant context and inject via stdout.
-  const context = await searchAndFormat(prompt, scopeId, DEFAULT_USER_ID);
+  const context = await searchAndFormat(prompt, scopeId, userId);
   if (context) process.stdout.write(formatOutput(context, "userPromptSubmit"));
 
   setTimeout(() => process.exit(0), 300).unref();

@@ -11,20 +11,28 @@ import { execSync } from "node:child_process";
 import { basename } from "node:path";
 
 // ---------------------------------------------------------------------------
+// Version
+// ---------------------------------------------------------------------------
+export const PLUGIN_VERSION = "1.0.0";
+
+// ---------------------------------------------------------------------------
 // Platform detection
 //
-// Claude Code sets CLAUDE_PLUGIN_ROOT; Codex sets PLUGIN_ROOT.
+// Claude Code sets CLAUDE_PLUGIN_ROOT; Codex sets CODEX_PLUGIN_ROOT.
+// OpenCode sets OPENCODE_PLUGIN_ROOT.
 // Used to derive a per-platform default user_id.
 // ---------------------------------------------------------------------------
 export function detectPlatform() {
   if (process.env.CLAUDE_PLUGIN_ROOT) return "claude-code";
-  if (process.env.PLUGIN_ROOT) return "codex";
+  if (process.env.CODEX_PLUGIN_ROOT) return "codex";
+  if (process.env.OPENCODE_PLUGIN_ROOT) return "opencode";
   return "unknown";
 }
 
 const PLATFORM_USER_ID = {
   "claude-code": "cc-user",
   "codex": "codex-user",
+  "opencode": "opencode-user",
   "unknown": "__default__",
 };
 
@@ -34,8 +42,26 @@ const PLATFORM_USER_ID = {
 export const REST_URL =
   process.env.AGENTARTS_MEMORY_SERVER_URL || "http://127.0.0.1:8719";
 export const DEBUG = process.env.AGENTARTS_MEMORY_DEBUG === "1";
-export const DEFAULT_USER_ID =
+
+// Default user_id from environment or platform detection
+const ENV_DEFAULT_USER_ID =
   process.env.AGENTARTS_MEMORY_USER_ID || PLATFORM_USER_ID[detectPlatform()];
+
+/**
+ * Resolve user_id with priority:
+ *   1. payload.user_id / payload.userId (from hook request)
+ *   2. AGENTARTS_MEMORY_USER_ID env var
+ *   3. Platform-based default (cc-user / codex-user / __default__)
+ */
+export function resolveUserId(payload) {
+  if (payload && typeof payload === "object") {
+    const explicit = payload.user_id || payload.userId;
+    if (explicit && typeof explicit === "string" && explicit.trim()) {
+      return explicit.trim();
+    }
+  }
+  return ENV_DEFAULT_USER_ID;
+}
 
 export const SEARCH_MEM_NUM = 5;
 export const SEARCH_SUMMARY_NUM = 3;
@@ -124,7 +150,12 @@ export function resolveProject(cwd) {
 // High-level operations
 // ---------------------------------------------------------------------------
 export async function addMessages(messages, scopeId, userId = DEFAULT_USER_ID) {
-  await post(EP_ADD_MESSAGES, { messages, user_id: userId, scope_id: scopeId }, 3000);
+  await post(EP_ADD_MESSAGES, {
+    messages,
+    user_id: userId,
+    scope_id: scopeId,
+    plugin_version: PLUGIN_VERSION,
+  }, 3000);
 }
 
 /**
@@ -139,6 +170,7 @@ export async function searchAndFormat(query, scopeId, userId = DEFAULT_USER_ID) 
       user_id: userId,
       scope_id: scopeId,
       threshold: DEFAULT_THRESHOLD,
+      plugin_version: PLUGIN_VERSION,
     }),
     postJson(EP_SEARCH_SUMMARY, {
       query,
@@ -146,6 +178,7 @@ export async function searchAndFormat(query, scopeId, userId = DEFAULT_USER_ID) 
       user_id: userId,
       scope_id: scopeId,
       threshold: DEFAULT_THRESHOLD,
+      plugin_version: PLUGIN_VERSION,
     }),
   ]);
 

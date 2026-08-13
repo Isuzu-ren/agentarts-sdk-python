@@ -15,8 +15,9 @@ from typing import Any
 
 logger = logging.getLogger("agentarts_memory_code_agent.server")
 
-ENV_AK = "HUAWEICLOUD_SDK_AK"
-ENV_SK = "HUAWEICLOUD_SDK_SK"
+# Debug mode from environment
+DEBUG = os.getenv("AGENTARTS_MEMORY_LOG_LEVEL", "info").lower() == "debug"
+
 ENV_API_KEY = "HUAWEICLOUD_SDK_MEMORY_API_KEY"
 ENV_REGION = "HUAWEICLOUD_SDK_REGION"
 ENV_SPACE_ID = "AGENTARTS_MEMORY_SPACE_ID"
@@ -73,7 +74,7 @@ class AgentArtsMemoryClient:
     # ── availability ──
     def is_configured(self) -> bool:
         """Return True if the minimal env vars are present (no network)."""
-        return bool(self._space_id and os.getenv(ENV_AK) and os.getenv(ENV_SK))
+        return bool(self._space_id and self._api_key)
 
     @property
     def space_id(self) -> str:
@@ -92,8 +93,13 @@ class AgentArtsMemoryClient:
         with self._lock:
             sid = self._sessions.get(scope_id)
             if sid:
+                if DEBUG:
+                    logger.debug("[SDK] session cache hit | scope_id=%s, session_id=%s", scope_id, sid)
                 return sid
             client = self._ensure_client()
+            if DEBUG:
+                logger.debug("[SDK] creating session | scope_id=%s, user_id=%s, space_id=%s",
+                           scope_id, actor_id, self._space_id[:8] + "...")
             session = client.create_memory_session(
                 space_id=self._space_id,
                 actor_id=actor_id,
@@ -103,6 +109,8 @@ class AgentArtsMemoryClient:
             if not sid:
                 raise RuntimeError("create_memory_session returned empty session id")
             self._sessions[scope_id] = sid
+            if DEBUG:
+                logger.debug("[SDK] session created | scope_id=%s, session_id=%s", scope_id, sid)
             return sid
 
     # ── operations ──
@@ -128,6 +136,9 @@ class AgentArtsMemoryClient:
             )
             for m in messages
         ]
+        if DEBUG:
+            logger.debug("[SDK] add_messages | user_id=%s, scope_id=%s, session_id=%s, count=%d",
+                       user_id, scope_id, sid, len(sdk_msgs))
         resp = client.add_messages(
             space_id=self._space_id,
             session_id=sid,
@@ -146,6 +157,9 @@ class AgentArtsMemoryClient:
     ) -> list[dict[str, Any]]:
         """Semantic search; returns normalized list of {content, score, type}."""
         client = self._ensure_client()
+        if DEBUG:
+            logger.debug("[SDK] search_memories | user_id=%s, scope_id=%s, query='%s...', num=%d",
+                       user_id, scope_id, query[:50] if query else "", num)
         filters = self._sdk.MemorySearchFilter(
             query=query,
             top_k=num,
@@ -153,7 +167,10 @@ class AgentArtsMemoryClient:
             actor_id=user_id,
         )
         resp = client.search_memories(space_id=self._space_id, filters=filters)
-        return self._normalize_search_results(resp)
+        results = self._normalize_search_results(resp)
+        if DEBUG:
+            logger.debug("[SDK] search_memories | results=%d", len(results))
+        return results
 
     def list_memories(
         self,
@@ -165,6 +182,9 @@ class AgentArtsMemoryClient:
     ) -> list[dict[str, Any]]:
         """List memory records; returns normalized list of {content, type, created_at}."""
         client = self._ensure_client()
+        if DEBUG:
+            logger.debug("[SDK] list_memories | user_id=%s, scope_id=%s, limit=%d",
+                       user_id or "default", scope_id or "default", limit)
         resp = client.list_memories(
             space_id=self._space_id,
             limit=limit,
@@ -177,8 +197,6 @@ class AgentArtsMemoryClient:
         return {
             "status": "healthy" if self.is_configured() else "misconfigured",
             "space_id": bool(self._space_id),
-            "ak": bool(os.getenv(ENV_AK)),
-            "sk": bool(os.getenv(ENV_SK)),
             "api_key": bool(self._api_key),
         }
 

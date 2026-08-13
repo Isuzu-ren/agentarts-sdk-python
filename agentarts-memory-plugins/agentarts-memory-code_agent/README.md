@@ -33,35 +33,65 @@ Claude Code / Codex / OpenCode agent loop
 
 ## 前置条件
 
-### 1. 环境变量（云端 SDK 鉴权）
-
-```bash
-export HUAWEICLOUD_SDK_AK="your-access-key"
-export HUAWEICLOUD_SDK_SK="your-secret-key"
-export AGENTARTS_MEMORY_SPACE_ID="your-space-id"
-export HUAWEICLOUD_SDK_MEMORY_API_KEY="your-memory-api-key"
-export HUAWEICLOUD_SDK_REGION="cn-southwest-2"   # 可选，默认 cn-southwest-2
-```
-
-### 2. 安装适配 server
+### 1. 安装适配 server
 
 ```bash
 cd agentarts-memory-plugins/agentarts-memory-code_agent
 pip install -e ".[cloud,dev]"   # 需要 agentarts-sdk + fastapi + uvicorn
 ```
 
-### 3. 启动适配 server
+### 2. 启动适配 server
+
+直接运行 server，如缺少必要配置会自动提示输入：
 
 ```bash
-agentarts-memory-server          # 默认 127.0.0.1:8719
-# 或
-python -m server.run
+agentarts-memory-server
 ```
 
-验证：
+启动时会检查环境变量：
+- ✅ 已配置 → 直接启动
+- ❌ 缺少配置 → 交互式提示输入
+
+交互示例：
+
+```
+============================================================
+AgentArts Memory Server Configuration
+============================================================
+
+⚠️  Missing required configuration:
+
+AgentArts Memory Space ID: my-space-id-12345
+  ✓ Configured: my-****45
+
+Huawei Cloud Memory API Key: ************************
+  ✓ Configured: ************************
+
+ℹ️  Optional: AgentArts Memory Region
+  Configure AgentArts Memory Region? [y/N]: y
+AgentArts Memory Region (default: cn-southwest-2): cn-north-4
+  ✓ Configured: cn-north-4
+
+------------------------------------------------------------
+Save configuration to ~/.zshrc for persistence? [y/N]: y
+  ✓ Configuration saved to /Users/xxx/.zshrc
+  Run 'source ~/.zshrc' or restart terminal to apply.
+
+============================================================
+Starting AgentArts Memory Server on 127.0.0.1:8719
+============================================================
+```
+
+可指定日志级别：
 
 ```bash
-curl http://127.0.0.1:8719/health   # {"status":"healthy",...}
+AGENTARTS_MEMORY_LOG_LEVEL=debug agentarts-memory-server
+```
+
+### 3. 验证
+
+```bash
+curl http://127.0.0.1:8719/health   # {"status":"healthy","space_id":true,"api_key":true}
 ```
 
 ## 安装插件
@@ -89,6 +119,8 @@ codex plugin add agentarts_memory
 codex_hooks = true
 ```
 
+hook 配置使用 `${CODEX_PLUGIN_ROOT}` 变量。
+
 ### OpenCode
 
 1. 拷贝插件文件和命令到 OpenCode 配置目录：
@@ -107,6 +139,29 @@ cp opencode/commands/remember.md ~/.config/opencode/commands/
   "plugin": ["./plugins/agentarts-memory-capture.ts"]
 }
 ```
+
+## user_id 解析优先级
+
+user_id 用于记忆隔离，解析优先级如下：
+
+```
+1. payload.user_id / payload.userId  (hook 请求携带)
+   ↓ 未提供或为空
+2. AGENTARTS_MEMORY_USER_ID 环境变量
+   ↓ 未设置
+3. 平台默认值（基于环境变量检测）
+```
+
+### 平台检测与默认 user_id
+
+| 平台 | 环境变量 | 默认 user_id |
+|------|----------|--------------|
+| Claude Code | `CLAUDE_PLUGIN_ROOT` | `cc-user` |
+| Codex | `CODEX_PLUGIN_ROOT` | `codex-user` |
+| OpenCode | `OPENCODE_PLUGIN_ROOT` | `opencode-user` |
+| 未知 | — | `__default__` |
+
+当插件通过 marketplace 正确安装时，各平台会自动设置对应的环境变量，无需手动配置。
 
 ## hooks → 端点映射
 
@@ -135,7 +190,7 @@ cp opencode/commands/remember.md ~/.config/opencode/commands/
 
 | 钩子 | 作用 | 记忆写入? | 注入? |
 |---|---|---|---|
-| `session.created` | 探测 `/health`，初始化 per-session 状态 | ❌ | ❌ |
+| `session.created` | 探测 `/health`，初始化 per-session 状态，解析 user_id | ❌ | ❌ |
 | `session.deleted` | 清理 per-session 缓存 | ❌ | ❌ |
 | `message.updated`（assistant） | AI 回复结束后写入暂存的用户 query | ✅（延后写入） | ❌ |
 | `chat.message` | 存用户 query、标记 pending、阻塞执行一次 search 并缓存 | ❌（延后写入） | ❌ |
@@ -149,8 +204,9 @@ cp opencode/commands/remember.md ~/.config/opencode/commands/
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `AGENTARTS_MEMORY_SERVER_URL` | `http://127.0.0.1:8719` | 本地 server 地址（hook/插件端） |
-| `AGENTARTS_MEMORY_USER_ID` | `cc-user`/`codex-user`/`opencode-user` | 记忆隔离 user_id |
-| `AGENTARTS_MEMORY_DEBUG` | `0` | 开调试日志 |
+| `AGENTARTS_MEMORY_USER_ID` | 平台默认值 | 记忆隔离 user_id |
+| `AGENTARTS_MEMORY_DEBUG` | `0` | 开调试日志 (1=开启) |
+| `AGENTARTS_MEMORY_LOG_LEVEL` | `info` | Server 日志级别 (debug/info/warning/error) |
 | `AGENTARTS_MEMORY_PROJECT_NAME` | git toplevel basename | scope_id 覆盖 |
 
 ## server API
@@ -173,6 +229,22 @@ pytest tests/agentarts-memory-code_agent/ -q
 
 # Node hook 脚本测试
 node --test tests/agentarts-memory-code_agent/test_scripts.mjs
+
+# 验证平台检测
+CLAUDE_PLUGIN_ROOT=/test node -e '
+import("./scripts/_shared.mjs").then(m => console.log(m.detectPlatform(), m.resolveUserId({})));
+'
+# 输出: claude-code cc-user
+
+CODEX_PLUGIN_ROOT=/test node -e '
+import("./scripts/_shared.mjs").then(m => console.log(m.detectPlatform(), m.resolveUserId({})));
+'
+# 输出: codex codex-user
+
+OPENCODE_PLUGIN_ROOT=/test node -e '
+import("./scripts/_shared.mjs").then(m => console.log(m.detectPlatform(), m.resolveUserId({})));
+'
+# 输出: opencode opencode-user
 ```
 
 ## 写入策略
