@@ -13,8 +13,6 @@ from pathlib import Path
 from typing import Any
 
 # ── Environment variable names ──
-ENV_AK = "HUAWEICLOUD_SDK_AK"
-ENV_SK = "HUAWEICLOUD_SDK_SK"
 ENV_API_KEY = "HUAWEICLOUD_SDK_MEMORY_API_KEY"
 ENV_REGION = "HUAWEICLOUD_SDK_REGION"
 ENV_SPACE_ID = "AGENTARTS_MEMORY_SPACE_ID"
@@ -34,7 +32,8 @@ SYSTEM_PROMPT_BLOCK = (
     "## Long-term Memory (AgentArts Memory)\n"
     "This session provides cross-session long-term memory via Huawei Cloud AgentArts Memory.\n"
     "- Conversation content is automatically written to memory after each turn (non-blocking)\n"
-    "- Relevant memories are injected before each LLM call (user profile / episodic / semantic + history summary)\n"
+    "- Relevant memories are injected before each LLM call"
+    " (user profile / episodic / semantic + history summary)\n"
     "- Use the ltm_search tool to actively retrieve long-term memories\n"
     "- Use the ltm_search_summary tool to view memory summaries\n"
 )
@@ -44,22 +43,8 @@ _NON_SECRET_KEYS = frozenset({"space_id", "region"})
 
 CONFIG_SCHEMA: list[dict[str, Any]] = [
     {
-        "key": "ak",
-        "description": "Huawei Cloud Access Key",
-        "secret": True,
-        "required": True,
-        "env_var": ENV_AK,
-    },
-    {
-        "key": "sk",
-        "description": "Huawei Cloud Secret Key",
-        "secret": True,
-        "required": True,
-        "env_var": ENV_SK,
-    },
-    {
         "key": "api_key",
-        "description": "Huawei Cloud AgentArts Memory API Key (data plane authentication)",
+        "description": "Huawei Cloud AgentArts Memory API Key",
         "secret": True,
         "required": True,
         "env_var": ENV_API_KEY,
@@ -67,23 +52,22 @@ CONFIG_SCHEMA: list[dict[str, Any]] = [
     {
         "key": "space_id",
         "description": "Huawei Cloud AgentArts Memory Space ID",
-        "secret": True,
         "required": True,
         "env_var": ENV_SPACE_ID,
     },
     {
         "key": "region",
-        "description": "Huawei Cloud region",
+        "description": "Huawei Cloud Region",
         "default": DEFAULT_REGION,
         "env_var": ENV_REGION,
     },
 ]
 
 
-def _save_config(values: dict[str, Any], hermes_home: str) -> None:
+def save_config(values: dict[str, Any], hermes_home: str) -> None:
     """Write non-secret config values to agentarts.json.
 
-    Secret fields (api_key, ak, sk) are handled by Hermes and written to .env.
+    Secret fields (api_key) are handled by Hermes and written to .env.
     Only non-secret fields (space_id, region) are persisted to the JSON file.
     """
     non_secret = {k: v for k, v in values.items() if k in _NON_SECRET_KEYS}
@@ -92,15 +76,12 @@ def _save_config(values: dict[str, Any], hermes_home: str) -> None:
     config_path.write_text(json.dumps(non_secret, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-# Public alias for backward compatibility with tests/external callers.
-save_config = _save_config
-
 TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "name": "ltm_search",
         "description": (
             "Search AgentArts long-term memory and return memory entries relevant to the query"
-            "(user profile / episodic / semantic + history summary)."
+            " (user profile / episodic / semantic + history summary)."
         ),
         "parameters": {
             "type": "object",
@@ -181,7 +162,7 @@ class AgentArtsMemoryProvider:
 
     def is_available(self) -> bool:
         """Check whether required env vars are set. Must NOT perform network requests."""
-        return all(bool(os.getenv(var)) for var in (ENV_AK, ENV_SK, ENV_API_KEY, ENV_SPACE_ID))
+        return all(bool(os.getenv(var)) for var in (ENV_API_KEY, ENV_SPACE_ID))
 
     def initialize(self, session_id: str, **kwargs: Any) -> None:
         """Called once when the agent starts.
@@ -196,8 +177,7 @@ class AgentArtsMemoryProvider:
         api_key = os.getenv(ENV_API_KEY, "")
 
         self._sdk = import_memory_sdk()
-        sdk = self._sdk
-        self._client = sdk.MemoryClient(
+        self._client = self._sdk.MemoryClient(
             region_name=region,
             api_key=api_key,
         )
@@ -225,7 +205,7 @@ class AgentArtsMemoryProvider:
         return CONFIG_SCHEMA
 
     def save_config(self, values: dict[str, Any], hermes_home: str) -> None:
-        _save_config(values, hermes_home)
+        save_config(values, hermes_home)
 
     # ── Tools ──
 
@@ -339,7 +319,7 @@ class AgentArtsMemoryProvider:
             with self._lock:
                 results = self._client.search_memories(
                     space_id=self._space_id,
-                    filters=sdk.MemorySearchFilter(query=query, top_k=5),
+                    filters=sdk.MemorySearchFilter(query=query, top_k=DEFAULT_TOP_K),
                 )
             return self._format_search_results(results, query)
         except Exception as e:
@@ -351,7 +331,7 @@ class AgentArtsMemoryProvider:
         result_list = getattr(results, "results", None)
         if not result_list:
             return ""
-        lines = [f"## Retrieved Long-term Memory (query: {query}）"]
+        lines = [f"## Retrieved Long-term Memory (query: {query})"]
         for i, item in enumerate(result_list, 1):
             if isinstance(item, dict):
                 record = item.get("record", {})
@@ -362,9 +342,7 @@ class AgentArtsMemoryProvider:
                 lines.append(f"{i}. {item}")
         return "\n".join(lines) + "\n"
 
-    def sync_turn(
-        self, user_content: str, assistant_content: str, *, session_id: str = "", messages=None
-    ) -> None:
+    def sync_turn(self, user_content: str, assistant_content: str) -> None:
         """Persist each conversation turn to AgentArts Memory (non-blocking)."""
         if not self._client:
             return

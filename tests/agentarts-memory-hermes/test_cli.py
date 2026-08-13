@@ -9,8 +9,6 @@ from cli import _config, _handle_command, _status, _test_connection, register_cl
 from provider import AgentArtsMemoryProvider
 
 ENV_VARS = {
-    "HUAWEICLOUD_SDK_AK": "test-ak",
-    "HUAWEICLOUD_SDK_SK": "test-sk",
     "HUAWEICLOUD_SDK_MEMORY_API_KEY": "test-api-key",
     "HUAWEICLOUD_SDK_REGION": "cn-southwest-2",
     "AGENTARTS_MEMORY_SPACE_ID": "test-space-id",
@@ -139,8 +137,6 @@ class TestStatusCommand:
     def test_lists_all_env_vars(self, env_vars, capsys):
         _status(argparse.Namespace())
         out = capsys.readouterr().out
-        assert "HUAWEICLOUD_SDK_AK" in out
-        assert "HUAWEICLOUD_SDK_SK" in out
         assert "HUAWEICLOUD_SDK_MEMORY_API_KEY" in out
         assert "AGENTARTS_MEMORY_SPACE_ID" in out
         assert "HUAWEICLOUD_SDK_REGION" in out
@@ -154,8 +150,6 @@ class TestStatusCommand:
     def test_masks_secret_values(self, env_vars, capsys):
         _status(argparse.Namespace())
         out = capsys.readouterr().out
-        assert "test-ak" not in out
-        assert "test-sk" not in out
         assert "test-api-key" not in out
 
     def test_shows_region_in_plaintext(self, env_vars, capsys):
