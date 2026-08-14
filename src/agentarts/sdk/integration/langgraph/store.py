@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from agentarts.sdk.memory import AsyncMemoryClient, MemoryClient
-from agentarts.sdk.memory.inner.config import MemorySearchFilter
+from agentarts.sdk.memory.inner.config import MemorySearchFilter, TextMessage
 from agentarts.sdk.utils.constant import get_region
 
 logger = logging.getLogger(__name__)
@@ -255,26 +255,24 @@ class AgentArtsMemoryStore(BaseStore):
         actor_id = op.value.get("actor_id")
         assistant_id = op.value.get("assistant_id")
 
-        message_data = {
-            "role": "user",
-            "parts": [{"type": "text", "text": content}],
-        }
-        if actor_id:
-            message_data["actor_id"] = actor_id
-        if assistant_id:
-            message_data["assistant_id"] = assistant_id
-
         meta = {
             "store_key": op.key,
             "store_namespace": list(op.namespace),
         }
-        message_data["meta"] = json.dumps(meta, ensure_ascii=False)
+
+        message = TextMessage(
+            role="user",
+            content=content,
+            actor_id=actor_id,
+            assistant_id=assistant_id,
+            meta=json.dumps(meta, ensure_ascii=False),
+        )
 
         try:
             self._client.add_messages(
                 space_id=self._space_id,
                 session_id=session_id,
-                messages=[message_data],
+                messages=[message],
             )
             logger.debug(f"Added message to session {session_id} for namespace {op.namespace}")
 
@@ -303,26 +301,24 @@ class AgentArtsMemoryStore(BaseStore):
         actor_id = op.value.get("actor_id")
         assistant_id = op.value.get("assistant_id")
 
-        message_data = {
-            "role": "user",
-            "parts": [{"type": "text", "text": content}],
-        }
-        if actor_id:
-            message_data["actor_id"] = actor_id
-        if assistant_id:
-            message_data["assistant_id"] = assistant_id
-
         meta = {
             "store_key": op.key,
             "store_namespace": list(op.namespace),
         }
-        message_data["meta"] = json.dumps(meta, ensure_ascii=False)
+
+        message = TextMessage(
+            role="user",
+            content=content,
+            actor_id=actor_id,
+            assistant_id=assistant_id,
+            meta=json.dumps(meta, ensure_ascii=False),
+        )
 
         try:
             await self._async_client.add_messages(
                 space_id=self._space_id,
                 session_id=session_id,
-                messages=[message_data],
+                messages=[message],
             )
             logger.debug(f"Added message to session {session_id} for namespace {op.namespace}")
 
