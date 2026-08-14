@@ -4,7 +4,27 @@
 
 一个插件目录同时覆盖三平台，共享同一个本地 HTTP 适配 server + hook 脚本逻辑。
 
-## 它做什么
+## 关于AgentArts Memory
+
+华为云 AgentArts Memory 是智能体云端记忆解决方案，对智能体记忆数据提供全生命周期管理。
+
+### AgentArts Memory优势
+
+1、开箱即用：
+短期记忆 + 长期记忆：支持短期记忆（7~365天）和长期记忆（持久化存储），满足不同时间跨度的记忆需求。
+
+2、多种记忆策略：
+支持语义记忆、用户偏好、会话摘要、情景记忆等策略，满足不同场景的记忆需求。
+
+3、多维度隔离：
+按策略类型隔离：支持按空间、会话、用户维度进行记忆隔离，确保数据的安全性和独立性。
+
+4、全托管免运维：
+云上全托管：无需管理数据库等基础设施和记忆处理引擎，实现业务快速上线，降低运维成本和复杂度。
+> 官方文档：[记忆库概述](https://support.huaweicloud.com/highcode-agentarts/agentarts_10_015.html) · [SDK 集成示例](https://support.huaweicloud.com/highcode-agentarts/agentarts_10_016.html) · [创建记忆库](https://support.huaweicloud.com/highcode-agentarts/agentarts_10_017.html)
+
+
+## 实现方式
 
 | 平台 | 接入方式 | hook 数 | 命令 |
 |---|---|---|---|
