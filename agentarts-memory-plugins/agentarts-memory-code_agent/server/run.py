@@ -370,9 +370,6 @@ def main() -> None:
         log_startup_info(config, log_level, host, port)
 
         run_server(log_level)
-        log_startup_info(config, log_level, host, port)
-
-        run_server(log_level)
 
 
 if __name__ == "__main__":

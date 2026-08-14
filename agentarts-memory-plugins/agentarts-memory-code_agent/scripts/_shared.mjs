@@ -44,7 +44,7 @@ export const REST_URL =
 export const DEBUG = process.env.AGENTARTS_MEMORY_DEBUG === "1";
 
 // Default user_id from environment or platform detection
-const ENV_DEFAULT_USER_ID =
+export const DEFAULT_USER_ID =
   process.env.AGENTARTS_MEMORY_USER_ID || PLATFORM_USER_ID[detectPlatform()];
 
 /**
@@ -60,7 +60,7 @@ export function resolveUserId(payload) {
       return explicit.trim();
     }
   }
-  return ENV_DEFAULT_USER_ID;
+  return DEFAULT_USER_ID;
 }
 
 export const SEARCH_MEM_NUM = 5;
