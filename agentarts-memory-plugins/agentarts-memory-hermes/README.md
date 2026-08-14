@@ -1,6 +1,6 @@
 # agentarts-memory-hermes
 
-Hermes Memory Provider 插件，将华为云 AgentArts Memory 作为 Hermes Agent 的长期记忆后端。
+Hermes Memory Provider 插件，将华为云 AgentArts Memory 作为 Hermes Agent 的云端记忆。
 
 ## 功能概述
 
@@ -26,16 +26,16 @@ Hermes Memory Provider 插件，将华为云 AgentArts Memory 作为 Hermes Agen
 
 ## 安装
 
-将插件目录agentarts-memory-hermes复制到 Hermes 的 memory provider 插件路径并重命名为agentarts-memory：
+将插件目录agentarts-memory-hermes复制到 Hermes 的 memory provider 插件路径并重命名为agentarts：
 
 ```bash
-cp -r agentarts-memory-hermes  ~/.hermes/hermes-agent/plugins/memory/agentarts-memory
+cp -r agentarts-memory-hermes  ~/.hermes/hermes-agent/plugins/memory/agentarts
 ```
 
 
 ## 配置
 
-通过命令 `hermes memory setup` 进行交互式配置，按提示选择 `agentarts-memory` 后，输入正确的参数完成配置。
+通过命令 `hermes memory setup` 进行交互式配置，按提示选择 `agentarts` 后，输入正确的参数完成配置。
 
 ## 工具说明
 
@@ -105,3 +105,19 @@ AgentArts Memory 从对话消息生成记忆需要时间（约 30 秒）。`sync
 pip install -e ".[dev]"
 pytest tests/agentarts-memory-hermes/ -v
 ```
+
+## 关于AgentArts Memory
+
+华为云 AgentArts Memory 是智能体云端记忆解决方案，对智能体记忆数据提供全生命周期管理。
+
+### AgentArts Memory优势
+
+1、开箱即用：短期记忆 + 长期记忆：支持短期记忆（7~365天）和长期记忆（持久化存储），满足不同时间跨度的记忆需求。
+
+2、多种记忆策略：支持语义记忆、用户偏好、会话摘要、情景记忆等策略，满足不同场景的记忆需求。
+
+3、多维度隔离：按策略类型隔离：支持按空间、会话、用户维度进行记忆隔离，确保数据的安全性和独立性。
+
+4、全托管免运维：云上全托管：无需管理数据库等基础设施和记忆处理引擎，实现业务快速上线，降低运维成本和复杂度。
+
+> 官方文档：[记忆库概述](https://support.huaweicloud.com/highcode-agentarts/agentarts_10_015.html) ****
