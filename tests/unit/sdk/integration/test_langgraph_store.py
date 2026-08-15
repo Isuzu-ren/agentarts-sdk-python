@@ -9,6 +9,7 @@ Tests cover:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -103,10 +104,11 @@ class TestAgentArtsMemoryStorePut:
                         store._handle_put(op)
 
     def test_put_calls_add_messages(self):
-        """Test that Put calls add_messages with correct params"""
+        """Test that Put constructs TextMessage (not raw dict) and calls add_messages."""
         from langgraph.store.base import PutOp
 
         from agentarts.sdk.integration.langgraph.store import AgentArtsMemoryStore
+        from agentarts.sdk.memory.inner.config import TextMessage
 
         with patch("agentarts.sdk.integration.langgraph.store.LANGGRAPH_AVAILABLE", True):
             with patch("agentarts.sdk.integration.langgraph.store.MemoryClient") as mock_client_cls:
@@ -135,8 +137,18 @@ class TestAgentArtsMemoryStorePut:
                     assert call_args.kwargs["session_id"] == "session-123"
                     messages = call_args.kwargs["messages"]
                     assert len(messages) == 1
-                    assert messages[0]["role"] == "user"
-                    assert messages[0]["actor_id"] == "user-001"
+                    # message must be TextMessage instance, not raw dict
+                    assert isinstance(messages[0], TextMessage)
+                    # Verify to_dict() outputs actor_id (was missing before fix)
+                    msg_dict = messages[0].to_dict()
+                    assert msg_dict["role"] == "user"
+                    assert msg_dict["actor_id"] == "user-001"
+                    assert "parts" in msg_dict
+                    # Verify meta contains store_key and store_namespace
+                    assert msg_dict["meta"] is not None
+                    meta = json.loads(msg_dict["meta"])
+                    assert meta["store_key"] == "msg-1"
+                    assert meta["store_namespace"] == ["memories", "user-001"]
 
     def test_put_delete_not_supported(self):
         """Test that delete (value=None) is not supported"""
@@ -161,6 +173,31 @@ class TestAgentArtsMemoryStorePut:
                     store._handle_put(op)
 
                     mock_client.add_messages.assert_not_called()
+
+    def test_put_swallows_exception(self):
+        """Test that Put swallows exceptions (default behavior, opt-in re-raise planned)."""
+        from langgraph.store.base import PutOp
+
+        from agentarts.sdk.integration.langgraph.store import AgentArtsMemoryStore
+
+        with patch("agentarts.sdk.integration.langgraph.store.LANGGRAPH_AVAILABLE", True):
+            with patch("agentarts.sdk.integration.langgraph.store.MemoryClient") as mock_client_cls:
+                with patch("agentarts.sdk.integration.langgraph.store.AsyncMemoryClient"):
+                    mock_client = MagicMock()
+                    mock_client.add_messages.side_effect = RuntimeError("network error")
+                    mock_client_cls.return_value = mock_client
+
+                    store = AgentArtsMemoryStore(space_id="test-space")
+
+                    op = PutOp(
+                        namespace=("memories",),
+                        key="msg-1",
+                        value={"content": "test", "session_id": "s1"},
+                    )
+
+                    # Should not raise, should return None
+                    result = store._handle_put(op)
+                    assert result is None
 
 
 class TestAgentArtsMemoryStoreSearch:
