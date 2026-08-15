@@ -3,6 +3,7 @@
 Usage:
     agentarts-memory install   [hermes|claude|codex|opencode|openclaw] [--global] [--yes]
     agentarts-memory uninstall [hermes|claude|codex|opencode|openclaw] [--global] [--yes]
+    agentarts-memory server    start|stop|status [--yes]
 """
 
 from __future__ import annotations
@@ -12,7 +13,9 @@ import os
 import sys
 
 from .platforms import detect_all, get_platform
+from .server_manager import start, status, stop
 from .utils import (
+    EscapeInterrupt,
     add,
     confirm,
     ensure_credentials,
@@ -64,6 +67,24 @@ def build_parser() -> argparse.ArgumentParser:
             help="Auto-confirm all prompts (CI-friendly).",
         )
 
+    # Server subcommand
+    sp = sub.add_parser(
+        "server",
+        help="manage the local adapter server",
+        description="Start, stop, or check status of the agentarts-memory-server.",
+    )
+    sp.add_argument(
+        "action",
+        choices=("start", "stop", "status"),
+        help="Server action to perform.",
+    )
+    sp.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="Auto-confirm all prompts (CI-friendly).",
+    )
+
     return parser
 
 
@@ -89,6 +110,7 @@ def _check_server_dependency(yes: bool) -> None:
     """Print server dependency hint for claude/codex/opencode."""
     print("\nNote: This platform requires the local adapter server (127.0.0.1:8719).")
     print("  Start it with: agentarts-memory-server")
+    print("  Or use:   agentarts-memory server start")
     print("  Install:  pip install -e agentarts-memory-plugins/agentarts-memory-code_agent")
 
 
@@ -245,6 +267,19 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_server(args: argparse.Namespace) -> int:
+    """Handle the server subcommand."""
+    set_yes(args.yes)
+
+    if args.action == "start":
+        return start()
+    elif args.action == "stop":
+        return stop()
+    elif args.action == "status":
+        return status()
+    return 1
+
+
 def _degraded_scan(target: str) -> None:
     """Attempt to find and clean up files when manifest is missing."""
     # Scan known platform directories for agentarts-memory markers.
@@ -283,10 +318,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "install":
-        return cmd_install(args)
-    elif args.command == "uninstall":
-        return cmd_uninstall(args)
+    try:
+        if args.command == "install":
+            return cmd_install(args)
+        elif args.command == "uninstall":
+            return cmd_uninstall(args)
+        elif args.command == "server":
+            return cmd_server(args)
+    except EscapeInterrupt:
+        print("\nCancelled.")
+        return 0
 
     parser.print_help()
     return 1

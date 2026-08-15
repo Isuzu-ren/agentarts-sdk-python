@@ -1,10 +1,18 @@
 """Tests for CLI entry point (P0 + P6)."""
 
 import os
+from unittest.mock import patch
 
 import pytest
 from agentarts_memory_installer import cli
-from agentarts_memory_installer.utils import ENV_API_KEY, ENV_REGION, ENV_SPACE_ID, expand, find
+from agentarts_memory_installer.utils import (
+    ENV_API_KEY,
+    ENV_REGION,
+    ENV_SPACE_ID,
+    EscapeInterrupt,
+    expand,
+    find,
+)
 
 VALID_TARGETS = cli.VALID_TARGETS
 build_parser = cli.build_parser
@@ -194,3 +202,70 @@ class TestEndToEndClaude:
         main(["install", "claude", "--global", "--yes"])
         out = capsys.readouterr().out
         assert "127.0.0.1:8719" in out
+
+
+# ── Server subcommand ──────────────────────────────────────────────
+
+
+class TestServerParser:
+    def test_parse_start(self):
+        args = build_parser().parse_args(["server", "start"])
+        assert args.command == "server"
+        assert args.action == "start"
+        assert args.yes is False
+
+    def test_parse_stop(self):
+        args = build_parser().parse_args(["server", "stop"])
+        assert args.action == "stop"
+
+    def test_parse_status(self):
+        args = build_parser().parse_args(["server", "status"])
+        assert args.action == "status"
+
+    def test_parse_yes_flag(self):
+        args = build_parser().parse_args(["server", "start", "--yes"])
+        assert args.yes is True
+        args2 = build_parser().parse_args(["server", "start", "-y"])
+        assert args2.yes is True
+
+    def test_invalid_action_rejected(self):
+        with pytest.raises(SystemExit):
+            build_parser().parse_args(["server", "bogus"])
+
+
+class TestServerDispatch:
+    def test_start_dispatches(self):
+        with patch("agentarts_memory_installer.cli.start", return_value=0) as mock_start:
+            assert main(["server", "start", "--yes"]) == 0
+            mock_start.assert_called_once()
+
+    def test_stop_dispatches(self):
+        with patch("agentarts_memory_installer.cli.stop", return_value=0) as mock_stop:
+            assert main(["server", "stop"]) == 0
+            mock_stop.assert_called_once()
+
+    def test_status_dispatches(self):
+        with patch("agentarts_memory_installer.cli.status", return_value=0) as mock_status:
+            assert main(["server", "status"]) == 0
+            mock_status.assert_called_once()
+
+    def test_start_yes_sets_global(self):
+        with patch("agentarts_memory_installer.cli.start", return_value=0):
+            with patch("agentarts_memory_installer.cli.set_yes") as mock_set_yes:
+                main(["server", "start", "--yes"])
+                mock_set_yes.assert_called_once_with(True)
+
+    def test_start_without_yes_sets_false(self):
+        with patch("agentarts_memory_installer.cli.start", return_value=0):
+            with patch("agentarts_memory_installer.cli.set_yes") as mock_set_yes:
+                main(["server", "start"])
+                mock_set_yes.assert_called_once_with(False)
+
+
+class TestEscapeInterrupt:
+    def test_main_catches_escape(self, capsys):
+        """main() should catch EscapeInterrupt and return 0."""
+        with patch("agentarts_memory_installer.cli.cmd_install", side_effect=EscapeInterrupt()):
+            rc = main(["install", "hermes", "--yes"])
+            assert rc == 0
+            assert "Cancelled" in capsys.readouterr().out

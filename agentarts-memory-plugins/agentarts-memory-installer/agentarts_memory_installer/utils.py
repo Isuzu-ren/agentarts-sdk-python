@@ -20,6 +20,19 @@ from typing import cast
 _YES: bool = False
 
 
+try:
+    import termios
+    import tty
+
+    _HAS_TTY = True
+except ImportError:
+    _HAS_TTY = False
+
+
+class EscapeInterrupt(BaseException):
+    """Raised when the user presses ESC during an interactive prompt."""
+
+
 def set_yes(value: bool) -> None:
     """Set the global non-interactive flag."""
     global _YES
@@ -321,7 +334,6 @@ def set_yaml_key(path: str, section: str, key: str, value: str) -> None:
     os.replace(tmp, p)
 
 
-
 # ── .env file (dedup by key) ─────────────────────────────────────────
 
 
@@ -423,13 +435,66 @@ def status_updated(label: str, path: str) -> None:
 # ── Interactive prompts ──────────────────────────────────────────────
 
 
+def _input_with_esc(prompt: str) -> str:
+    """Read a line of input with ESC detection.
+
+    In raw terminal mode, detects ESC (``\\x1b``) and raises
+    :class:`EscapeInterrupt` immediately.  Falls back to regular
+    ``input()`` on non-Unix or when raw mode is unavailable.
+    """
+    if not _HAS_TTY:
+        return input(prompt)
+
+    fd = sys.stdin.fileno()
+    try:
+        old_settings = termios.tcgetattr(fd)
+    except (termios.error, ValueError):
+        return input(prompt)
+
+    try:
+        tty.setraw(fd)
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        buf: list[str] = []
+        while True:
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":  # ESC
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
+                raise EscapeInterrupt()
+            elif ch in ("\r", "\n"):  # Enter
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
+                return "".join(buf)
+            elif ch in ("\x7f", "\b"):  # Backspace / Delete
+                if buf:
+                    buf.pop()
+                    sys.stdout.write("\b \b")
+                    sys.stdout.flush()
+            elif ch == "\x03":  # Ctrl+C
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
+                raise KeyboardInterrupt()
+            elif ch == "\x04":  # Ctrl+D
+                sys.stdout.write("\r\n")
+                sys.stdout.flush()
+                raise EOFError()
+            elif "\x20" <= ch <= "\x7e":  # Printable ASCII
+                buf.append(ch)
+                sys.stdout.write(ch)
+                sys.stdout.flush()
+            # Ignore other control characters
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 def confirm(prompt: str, default: bool = True) -> bool:
     """Yes/no confirmation.  Returns *default* when ``--yes`` or non-interactive."""
     if _YES or not sys.stdin.isatty():
         return default
     suffix = " [Y/n] " if default else " [y/N] "
     try:
-        raw = input(prompt + suffix).strip().lower()
+        raw = _input_with_esc(prompt + suffix).strip().lower()
     except (EOFError, KeyboardInterrupt):
         return default
     if not raw:
@@ -442,7 +507,7 @@ def prompt_input(prompt: str, default: str = "") -> str:
     if _YES:
         return default
     try:
-        raw = input(prompt + ": ").strip()
+        raw = _input_with_esc(prompt + ": ").strip()
     except (EOFError, KeyboardInterrupt):
         return default
     return raw if raw else default
@@ -457,7 +522,7 @@ def select_one(prompt: str, options: list[str], default_idx: int = 0) -> int:
         marker = "*" if i == default_idx else " "
         print(f"  {i + 1}) {opt} {marker}")
     try:
-        raw = input(f"Choice (1-{len(options)}) [{default_idx + 1}]: ").strip()
+        raw = _input_with_esc(f"Choice (1-{len(options)}) [{default_idx + 1}]: ").strip()
     except (EOFError, KeyboardInterrupt):
         return default_idx
     if not raw:

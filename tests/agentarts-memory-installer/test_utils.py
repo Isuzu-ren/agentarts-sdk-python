@@ -3,12 +3,14 @@
 import json
 import os
 
+import pytest
 from agentarts_memory_installer import utils
 from agentarts_memory_installer.utils import (
     DEFAULT_REGION,
     ENV_API_KEY,
     ENV_REGION,
     ENV_SPACE_ID,
+    EscapeInterrupt,
     add,
     check_env,
     claude_hooks_template,
@@ -806,3 +808,41 @@ class TestInteractive:
         utils.set_yes(True)
         assert select_one("pick", ["a", "b"], default_idx=1) == 1
         utils.set_yes(False)
+
+
+class TestEscapeInterrupt:
+    """ESC during interactive prompts should exit the program."""
+
+    def test_confirm_propagates_escape(self, monkeypatch):
+        """confirm() must not swallow EscapeInterrupt."""
+        utils.set_yes(False)
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr(
+            utils, "_input_with_esc", lambda prompt: (_ for _ in ()).throw(EscapeInterrupt())
+        )
+        with pytest.raises(EscapeInterrupt):
+            confirm("test?", default=True)
+
+    def test_prompt_input_propagates_escape(self, monkeypatch):
+        utils.set_yes(False)
+        monkeypatch.setattr(
+            utils, "_input_with_esc", lambda prompt: (_ for _ in ()).throw(EscapeInterrupt())
+        )
+        with pytest.raises(EscapeInterrupt):
+            prompt_input("enter")
+
+    def test_select_one_propagates_escape(self, monkeypatch):
+        utils.set_yes(False)
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr(
+            utils, "_input_with_esc", lambda prompt: (_ for _ in ()).throw(EscapeInterrupt())
+        )
+        with pytest.raises(EscapeInterrupt):
+            select_one("pick", ["a", "b"])
+
+    def test_input_with_esc_fallback_no_tty(self, monkeypatch):
+        """When _HAS_TTY is False, _input_with_esc falls back to input()."""
+        monkeypatch.setattr(utils, "_HAS_TTY", False)
+        monkeypatch.setattr("builtins.input", lambda prompt: "hello")
+        result = utils._input_with_esc("prompt: ")
+        assert result == "hello"
