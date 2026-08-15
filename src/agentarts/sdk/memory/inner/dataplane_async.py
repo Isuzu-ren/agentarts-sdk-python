@@ -103,6 +103,19 @@ class _AsyncDataPlane:
         await self.client.delete_session(space_id, session_id)
         logger.info(f"Session deleted: {session_id} in space: {space_id}")
 
+    async def get_session(self, space_id: str, session_id: str) -> SessionInfo:
+        """Get session details - identical to sync version."""
+        if not space_id:
+            msg = "space_id is required for data plane operations"
+            raise ValueError(msg)
+        if not session_id:
+            msg = "session_id is required for get_session"
+            raise ValueError(msg)
+
+        result = await self.client.get_session(space_id, session_id)
+        logger.info(f"Session retrieved: {session_id} in space: {space_id}")
+        return SessionInfo.from_dict(result)
+
     async def add_messages(
             self,
             space_id: str,
