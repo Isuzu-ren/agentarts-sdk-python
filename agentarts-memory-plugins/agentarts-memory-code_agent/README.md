@@ -119,8 +119,11 @@ curl http://127.0.0.1:8719/health   # {"status":"healthy","space_id":true,"api_k
 ### Claude Code
 
 ```bash
-# 注册 marketplace 后安装
-/plugin install agentarts_memory
+# 从github注册 marketplace
+/plugin marketplace add huaweicloud/agentarts-sdk-python
+# 安装
+/plugin install agentarts-memory-plugins@agentarts-memory-code_agent
+/plugin install jiuwen_memory@jiuwen-memory-plugins
 ```
 
 hook 配置由 `hooks/hooks.json` 提供（12 个生命周期 hook），使用 `${CLAUDE_PLUGIN_ROOT}` 变量。

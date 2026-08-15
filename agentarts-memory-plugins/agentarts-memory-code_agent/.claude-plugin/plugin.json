@@ -1,7 +1,7 @@
 {
   "name": "agentarts_memory",
   "version": "1.0.0",
-  "description": "Huawei Cloud AgentArts Memory as long-term memory backend for Claude Code. 12 hooks.",
+  "description": "Huawei Cloud AgentArts Memory as cloud memory backend for Claude Code. 12 hooks.",
   "author": {
     "name": "AgentArts"
   },
