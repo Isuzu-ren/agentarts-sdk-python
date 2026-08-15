@@ -23,6 +23,7 @@ export const PLUGIN_VERSION = "1.0.0";
 // Used to derive a per-platform default user_id.
 // ---------------------------------------------------------------------------
 export function detectPlatform() {
+  if (process.env.AGENTARTS_MEMORY_PLATFORM) return process.env.AGENTARTS_MEMORY_PLATFORM;
   if (process.env.CLAUDE_PLUGIN_ROOT) return "claude-code";
   if (process.env.CODEX_PLUGIN_ROOT) return "codex";
   if (process.env.OPENCODE_PLUGIN_ROOT) return "opencode";
@@ -49,11 +50,12 @@ export const DEFAULT_USER_ID =
 
 /**
  * Resolve user_id with priority:
- *   1. payload.user_id / payload.userId (from hook request)
- *   2. AGENTARTS_MEMORY_USER_ID env var
+ *   1. AGENTARTS_MEMORY_USER_ID env var (explicit override)
+ *   2. payload.user_id / payload.userId (from hook request)
  *   3. Platform-based default (cc-user / codex-user / __default__)
  */
 export function resolveUserId(payload) {
+  if (process.env.AGENTARTS_MEMORY_USER_ID) return process.env.AGENTARTS_MEMORY_USER_ID;
   if (payload && typeof payload === "object") {
     const explicit = payload.user_id || payload.userId;
     if (explicit && typeof explicit === "string" && explicit.trim()) {

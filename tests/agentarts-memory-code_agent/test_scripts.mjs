@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import assert from "node:assert/strict";
@@ -59,6 +60,43 @@ test("_shared.coerceText handles string and array", async () => {
   assert.equal(mod.coerceText("abc"), "abc");
   assert.equal(mod.coerceText([{ text: "a" }, "b"]), "a b");
   assert.equal(mod.coerceText(""), "");
+});
+
+// ── _shared.mjs platform detection ────────────────────────────────
+function importDefaultUserId(env) {
+  const modUrl = pathToFileURL(join(SCRIPTS, "_shared.mjs")).href + "?t=" + Date.now();
+  const r = spawnSync(process.execPath, ["-e",
+    `import(${JSON.stringify(modUrl)}).then(m => console.log(m.DEFAULT_USER_ID))`,
+  ], {
+    env: { ...process.env, ...env },
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return r.stdout.trim();
+}
+
+test("_shared: AGENTARTS_MEMORY_PLATFORM=codex yields codex-user", () => {
+  assert.equal(importDefaultUserId({ AGENTARTS_MEMORY_PLATFORM: "codex" }), "codex-user");
+});
+
+test("_shared: AGENTARTS_MEMORY_PLATFORM=claude-code yields cc-user", () => {
+  assert.equal(importDefaultUserId({ AGENTARTS_MEMORY_PLATFORM: "claude-code" }), "cc-user");
+});
+
+test("_shared: AGENTARTS_MEMORY_USER_ID overrides platform default", () => {
+  assert.equal(
+    importDefaultUserId({ AGENTARTS_MEMORY_PLATFORM: "codex", AGENTARTS_MEMORY_USER_ID: "zrm" }),
+    "zrm",
+  );
+});
+
+test("_shared: no platform env yields __default__", () => {
+  assert.equal(importDefaultUserId({
+    AGENTARTS_MEMORY_PLATFORM: "",
+    CLAUDE_PLUGIN_ROOT: "",
+    CODEX_PLUGIN_ROOT: "",
+    OPENCODE_PLUGIN_ROOT: "",
+  }), "__default__");
 });
 
 // ── session-start.mjs ─────────────────────────────────────────────
