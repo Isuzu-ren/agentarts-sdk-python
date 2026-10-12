@@ -71,6 +71,7 @@ Agent 配备了两个工具：
 1. **calculate** - 计算数学表达式（支持 sqrt、sin、cos、log 等）
 2. **get_current_time** - 获取当前日期和时间
 
+
 Agent 的 `instruction` 引用 `{user:preferences?}` 模板，使偏好能进入提示词。
 
 ## 模型配置
